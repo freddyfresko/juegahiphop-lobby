@@ -30,16 +30,6 @@ export default function Header({ user, profile, isAdmin }: HeaderProps) {
     router.refresh()
   }, [router])
 
-  const goToLogin = useCallback((e?: React.MouseEvent) => {
-    e?.preventDefault()
-    router.push('/login')
-  }, [router])
-
-  const goToRegister = useCallback((e?: React.MouseEvent) => {
-    e?.preventDefault()
-    router.push('/login?view=register')
-  }, [router])
-
   return (
     <header className="relative z-50 border-b border-white/[0.06] bg-black/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -116,18 +106,18 @@ export default function Header({ user, profile, isAdmin }: HeaderProps) {
           ) : (
             /* ❌ Invitado → botones login/registro */
             <div className="flex items-center gap-2">
-              <button
-                onClick={goToLogin}
+              <a
+                href="/login"
                 className="rounded-lg border border-white/[0.08] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
               >
                 INICIAR SESIÓN
-              </button>
-              <button
-                onClick={goToRegister}
+              </a>
+              <a
+                href="/login?view=register"
                 className="rounded-lg bg-yellow-400 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-black transition-colors hover:bg-yellow-300"
               >
                 REGISTRO
-              </button>
+              </a>
             </div>
           )}
 
@@ -185,18 +175,20 @@ export default function Header({ user, profile, isAdmin }: HeaderProps) {
               </button>
             ) : (
               <>
-                <button
-                  onClick={() => { goToLogin(); setMobileMenuOpen(false) }}
+                <a
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
                   className="text-sm font-semibold tracking-[0.15em] text-yellow-400"
                 >
                   INICIAR SESIÓN
-                </button>
-                <button
-                  onClick={() => { goToRegister(); setMobileMenuOpen(false) }}
+                </a>
+                <a
+                  href="/login?view=register"
+                  onClick={() => setMobileMenuOpen(false)}
                   className="text-sm font-semibold tracking-[0.15em] text-yellow-400"
                 >
                   REGISTRARSE
-                </button>
+                </a>
               </>
             )}
           </nav>

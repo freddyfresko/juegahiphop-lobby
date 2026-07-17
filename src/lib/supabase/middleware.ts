@@ -31,14 +31,19 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Intentar obtener usuario. Si falla la red, asumir no autenticado.
+  let user = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    // Error de red/cookie inválida → tratar como no autenticado
+    user = null
+  }
 
   const pathname = request.nextUrl.pathname
 
   // ─── Rutas que requieren autenticación ───
-  // Solo perfil y admin necesitan cuenta
   const protectedRoutes = ['/perfil', '/admin']
   const isProtected = protectedRoutes.some((route) => pathname.startsWith(route))
 
@@ -50,9 +55,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Si está en login y ya tiene sesión → redirect al lobby
+  // ─── Login page redirect ───
+  // Solo redirige si el usuario tiene email e ID válidos (evita cookies fantasma)
   const isAuthPage = pathname.startsWith('/login')
-  if (isAuthPage && user) {
+  if (isAuthPage && user && user.email && user.id) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
