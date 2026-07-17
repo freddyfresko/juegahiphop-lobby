@@ -218,10 +218,14 @@ export default function GameCard({ game, progress }: GameCardProps) {
           <div className="mt-4">
             {isPlayable ? (
               <div
-                className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-black transition-all group-hover:shadow-lg"
+                className="flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all duration-300"
                 style={{
-                  backgroundColor: accentColor,
-                  boxShadow: isHovered ? `0 4px 15px ${accentColor}44` : 'none',
+                  borderColor: accentColor,
+                  color: isHovered ? '#000' : accentColor,
+                  backgroundColor: isHovered ? accentColor : 'transparent',
+                  boxShadow: isHovered
+                    ? `0 0 20px ${accentColor}66, 0 0 60px ${accentColor}22, inset 0 0 20px ${accentColor}22`
+                    : `0 0 0px transparent`,
                 }}
               >
                 <span>JUGAR</span>
