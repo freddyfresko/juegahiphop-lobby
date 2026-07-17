@@ -1,0 +1,21 @@
+{
+  "name": "@juegahiphop/sdk",
+  "version": "0.2.0",
+  "description": "SDK de comunicación entre el Lobby JuegaHipHop y los juegos vía postMessage",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "appHosting": {
+    "appId": "",
+    "source": {
+      "dir": "."
+    },
+    "framework": "nextjs",
+    "buildCommand": "npm run build",
+    "outputDir": ".next"
+  }
+}
