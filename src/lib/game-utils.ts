@@ -5,6 +5,9 @@
 /** Patrones de URL permitidos para juegos */
 const ALLOWED_URL_PATTERNS = [
   /^https:\/\/[a-z0-9-]+\.juegahiphop\.cl$/,
+  /^https:\/\/[a-z0-9-]+\.web\.app$/,
+  /^https:\/\/[a-z0-9-]+\.firebaseapp\.com$/,
+  /^https:\/\/[a-z0-9-]+--[a-z0-9-]+\.hosted\.app$/,
   /^https:\/\/[a-z0-9-]+\.supabase\.co$/,
   /^https:\/\/localhost:\d+$/,
   /^http:\/\/localhost:\d+$/,
