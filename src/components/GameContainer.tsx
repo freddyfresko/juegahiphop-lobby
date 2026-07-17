@@ -426,7 +426,7 @@ export default function GameContainer({
 
   // ─── Render ───
 
-  const showIframe = state === 'playing' || state === 'handshake' || state === 'saving'
+  const showIframe = state !== 'timeout' && state !== 'error'
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
