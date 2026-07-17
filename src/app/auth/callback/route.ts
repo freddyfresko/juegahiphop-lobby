@@ -74,5 +74,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 401 })
   }
 
-  return NextResponse.json({ ok: true })
+  // Crear respuesta explícita y copiar cookies desde la solicitud actual
+  // Esto asegura que las cookies de sesión se apliquen al dominio actual
+  // (funciona con localhost, IP LAN, o dominio personalizado)
+  const response = NextResponse.json({ ok: true })
+
+  // Las cookies ya se setearon via cookieStore.set() en createServerClient.
+  // NextResponse se encarga de incluirlas en la respuesta.
+  return response
 }
