@@ -149,12 +149,12 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
   const heroBanner = banners.length > 0 ? banners[0] : null
 
   return (
-    <div className="vignette brick-bg graffiti-spray flex min-h-screen flex-col">
-      <div className="relative z-10 flex min-h-screen flex-col">
+    <div className="vignette brick-bg graffiti-spray flex min-h-dvh flex-col">
+      <div className="relative z-10 flex min-h-dvh flex-col">
         <Header user={user} profile={profile} isAdmin={isAdmin} />
 
         {/* ─── HERO SECTION ─── */}
-        <section className="relative flex min-h-[50vh] items-center justify-center overflow-hidden border-b border-white/[0.04] sm:min-h-[70vh]">
+        <section className="relative flex min-h-[calc(100svh-3.5rem)] items-center justify-center overflow-hidden border-b border-white/[0.04] sm:min-h-[70vh]">
           {heroBanner?.image_url && (
             <>
               {/* Background image */}
@@ -193,7 +193,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
             </>
           )}
 
-          <div className="relative z-10 mx-auto max-w-4xl px-4 text-center">
+          <div className="relative z-10 mx-auto max-w-4xl px-4 py-10 text-center sm:py-14">
             <div className="animate-fade-in">
               {/* Crown icon */}
               <svg className="mx-auto mb-3 h-10 w-10 text-yellow-400 sm:h-12 sm:w-12 animate-float" viewBox="0 0 24 24" fill={heroBanner?.accent_color || '#facc15'}>
@@ -201,7 +201,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
               </svg>
 
               <h1
-                className="font-archivo text-5xl font-normal leading-none tracking-wide sm:text-6xl md:text-7xl lg:text-8xl"
+                className="font-archivo text-4xl font-normal leading-none tracking-wide min-[380px]:text-5xl sm:text-6xl md:text-7xl lg:text-8xl"
                 style={{ color: heroBanner?.text_color || '#ffffff' }}
               >
                 {heroBanner?.title?.split(' ').map((word, i) =>
@@ -237,7 +237,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
               {heroBanner?.link_url && (
                 <a
                   href={heroBanner.link_url}
-                  className="mt-8 inline-block rounded-xl bg-yellow-400 px-8 py-3 text-sm font-bold text-black transition-all hover:bg-yellow-300 active:scale-[0.97]"
+                  className="mt-8 inline-flex min-h-12 items-center justify-center rounded-xl bg-yellow-400 px-8 py-3 text-sm font-bold text-black transition-all hover:bg-yellow-300 active:scale-[0.97]"
                   style={{ backgroundColor: heroBanner.accent_color || '#facc15' }}
                 >
                   {heroBanner.link_label || 'JUGAR AHORA'}
@@ -255,7 +255,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
         </section>
 
         {/* ─── GAMES SECTION ─── */}
-        <section id="juegos" className="py-12 sm:py-16 lg:py-20">
+        <section id="juegos" className="py-10 sm:py-16 lg:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-16">
@@ -279,7 +279,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
               <>
                 {availableGames.length > 0 && (
                   <>
-                    <div className="mb-10 text-center">
+                    <div className="mb-8 text-center sm:mb-10">
                       <h2 className="font-archivo text-2xl tracking-wide text-white sm:text-3xl lg:text-4xl">
                         JUEGOS <span className="text-yellow-400">DISPONIBLES</span>
                       </h2>
@@ -290,7 +290,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                         </p>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
                       {availableGames.map((game, i) => (
                         <div key={game.slug} style={{ animationDelay: `${(i + 1) * 100}ms` }}>
                           <GameCard game={game} progress={progressMap[game.slug] ?? null} />
@@ -302,7 +302,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
 
                 {comingSoonGames.length > 0 && (
                   <div className={availableGames.length > 0 ? 'mt-16 sm:mt-20' : ''}>
-                    <div className="mb-10 text-center">
+                    <div className="mb-8 text-center sm:mb-10">
                       <h2 className="font-archivo text-2xl tracking-wide text-white sm:text-3xl lg:text-4xl">
                         PRÓXIMOS <span className="text-yellow-400">LANZAMIENTOS</span>
                       </h2>
@@ -311,7 +311,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                         Prepárate para lo que se viene 🔥
                       </p>
                     </div>
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
                       {comingSoonGames.map((game, i) => (
                         <div key={game.slug} style={{ animationDelay: `${(i + 1) * 100}ms` }}>
                           <GameCard game={game} progress={null} />
@@ -383,7 +383,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
               © 2025 Juega Hip Hop — La cultura es tu mejor arma
             </div>
             {debug && (
-              <div className="mt-2 text-center text-[8px] text-zinc-800">
+              <div className="hidden mt-2 text-center text-[8px] text-zinc-800">
                 [{debug}]
               </div>
             )}

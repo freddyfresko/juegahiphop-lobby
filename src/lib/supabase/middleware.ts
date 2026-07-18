@@ -55,14 +55,5 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // ─── Login page redirect ───
-  // Solo redirige si el usuario tiene email e ID válidos (evita cookies fantasma)
-  const isAuthPage = pathname.startsWith('/login')
-  if (isAuthPage && user && user.email && user.id) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
-  }
-
   return supabaseResponse
 }

@@ -429,15 +429,16 @@ export default function GameContainer({
   const showIframe = state !== 'timeout' && state !== 'error'
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
+    <div className="fixed inset-0 z-50 flex min-h-dvh flex-col bg-black">
       {/* ─── Top bar ─── */}
       <div
-        className="flex h-12 shrink-0 items-center justify-between px-3 sm:px-4 safe-area-top"
+        className="safe-area-top flex h-12 shrink-0 items-center justify-between gap-2 px-3 sm:px-4"
         style={{ backgroundColor: `${game.color}22`, borderBottom: `1px solid ${game.color}33` }}
       >
         <button
           onClick={handleExitClick}
-          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+          className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white active:bg-white/[0.10]"
+          type="button"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -445,9 +446,9 @@ export default function GameContainer({
           <span className="hidden sm:inline">VOLVER</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="text-base">{game.emoji}</span>
-          <span className="font-archivo text-sm tracking-wide text-white">
+          <span className="truncate font-archivo text-sm tracking-wide text-white">
             {game.name}
           </span>
           {state === 'saving' && (
@@ -467,8 +468,9 @@ export default function GameContainer({
 
         <button
           onClick={toggleFullscreen}
-          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+          className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white active:bg-white/[0.10]"
           title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          type="button"
         >
           {isFullscreen ? (
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -562,8 +564,8 @@ export default function GameContainer({
 
       {/* ─── Exit confirmation dialog ─── */}
       {showExitConfirm && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/[0.08] bg-zinc-900 p-6 text-center shadow-2xl">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-zinc-900 p-6 text-center shadow-2xl">
             <div className="mb-3 text-3xl">🚪</div>
             <h3 className="font-archivo text-lg tracking-wide text-white">
               ¿SALIR DEL JUEGO?

@@ -18,6 +18,12 @@ export default function AuthForm({ initialView }: AuthFormProps) {
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
+      if (view === 'login') {
+        // Login usa POST nativo server-side (/auth/login). Es más confiable en
+        // Safari iOS porque Supabase escribe cookies en el mismo redirect HTTP.
+        return
+      }
+
       e.preventDefault()
       setLoading(true)
       setError(null)
@@ -26,44 +32,7 @@ export default function AuthForm({ initialView }: AuthFormProps) {
       const supabase = createClient()
 
       try {
-        if (view === 'login') {
-          const { data, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          })
-
-          if (signInError) {
-            setError(signInError.message)
-            setLoading(false)
-            return
-          }
-
-          if (!data.session) {
-            setError('No se pudo crear la sesión. Intenta de nuevo.')
-            setLoading(false)
-            return
-          }
-
-          // Safari iOS puede no persistir bien cookies seteadas desde JS.
-          // Enviamos la sesión al callback server-side para escribir cookies HTTP.
-          const res = await fetch('/auth/callback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-              access_token: data.session.access_token,
-              refresh_token: data.session.refresh_token,
-            }),
-          })
-
-          if (!res.ok) {
-            setError('No se pudo establecer la sesión. Intenta de nuevo.')
-            setLoading(false)
-            return
-          }
-
-          window.location.replace('/')
-        } else {
+        if (view === 'register') {
           const { error: signUpError } = await supabase.auth.signUp({
             email,
             password,
@@ -104,13 +73,14 @@ export default function AuthForm({ initialView }: AuthFormProps) {
   }, [])
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form action={view === 'login' ? '/auth/login' : undefined} method="post" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="email" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
           Correo electrónico
         </label>
         <input
           id="email"
+          name="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -127,6 +97,7 @@ export default function AuthForm({ initialView }: AuthFormProps) {
         </label>
         <input
           id="password"
+          name="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

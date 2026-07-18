@@ -21,6 +21,18 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       title: 'Error al iniciar sesión',
       description: 'No se pudo establecer la sesión. Intenta de nuevo.',
     },
+    InvalidCredentials: {
+      title: 'Datos incorrectos',
+      description: 'El correo o contraseña no coinciden en Supabase.',
+    },
+    EmailNotConfirmed: {
+      title: 'Correo no confirmado',
+      description: 'Supabase exige confirmar el correo antes de iniciar sesión. Revisa tu bandeja de entrada.',
+    },
+    MissingCredentials: {
+      title: 'Faltan datos',
+      description: 'Ingresa correo y contraseña para continuar.',
+    },
     ConfigurationError: {
       title: 'Error de configuración',
       description: 'Hay un problema con la configuración de la plataforma.',

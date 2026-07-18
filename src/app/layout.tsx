@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Bangers, Inter } from 'next/font/google'
 import './globals.css'
 
@@ -26,6 +26,11 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  colorScheme: 'dark',
+  themeColor: '#0a0a0a',
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,8 +40,9 @@ export default function RootLayout({
     <html
       lang="es"
       className={`${bangers.variable} ${inter.variable} h-full`}
+      data-scroll-behavior="smooth"
     >
-      <body className="h-full bg-[#0a0a0a] font-inter text-white antialiased">
+      <body className="min-h-dvh overflow-x-hidden bg-[#0a0a0a] font-inter text-white antialiased">
         {children}
       </body>
     </html>

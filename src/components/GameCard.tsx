@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useRef, useState, useCallback } from 'react'
 import type { GameCatalogEntry } from '@/lib/types'
 
@@ -19,8 +18,7 @@ const STATUS_LABELS: Record<string, { label: string; icon: string }> = {
 }
 
 export default function GameCard({ game, progress }: GameCardProps) {
-  const router = useRouter()
-  const cardRef = useRef<HTMLDivElement>(null)
+  const cardRef = useRef<HTMLElement | null>(null)
   const [tilt, setTilt] = useState({ x: 0, y: 0 })
   const [isHovered, setIsHovered] = useState(false)
   const [glowPos, setGlowPos] = useState({ x: 50, y: 50 })
@@ -29,13 +27,9 @@ export default function GameCard({ game, progress }: GameCardProps) {
   const statusInfo = !isPlayable ? STATUS_LABELS[game.status] : null
   const accentColor = game.accent_color ?? game.color ?? '#7C3AED'
   const baseColor = game.color ?? '#7C3AED'
+  const href = `/jugar/${game.slug}`
 
-  const handlePlay = () => {
-    if (!isPlayable) return
-    router.push(`/jugar/${game.slug}`)
-  }
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
     const card = cardRef.current
     if (!card) return
 
@@ -43,14 +37,12 @@ export default function GameCard({ game, progress }: GameCardProps) {
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
 
-    // Tilt: rotate based on mouse position relative to center
     const centerX = rect.width / 2
     const centerY = rect.height / 2
     const tiltX = ((y - centerY) / centerY) * -6
     const tiltY = ((x - centerX) / centerX) * 6
     setTilt({ x: tiltX, y: tiltY })
 
-    // Glow: follow mouse as percentage
     setGlowPos({
       x: (x / rect.width) * 100,
       y: (y / rect.height) * 100,
@@ -70,16 +62,8 @@ export default function GameCard({ game, progress }: GameCardProps) {
     ? Math.min((progress.current / progress.total) * 100, 100)
     : 0
 
-  return (
-    <div
-      ref={cardRef}
-      className="group relative cursor-pointer"
-      style={{ perspective: '1000px' }}
-      onClick={handlePlay}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+  const cardContent = (
+    <>
       {/* ─── Glow background (sigue al mouse) ─── */}
       <div
         className="pointer-events-none absolute -inset-[2px] rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
@@ -91,7 +75,7 @@ export default function GameCard({ game, progress }: GameCardProps) {
 
       {/* ─── Card body ─── */}
       <div
-        className="relative rounded-2xl border transition-all duration-200 ease-out"
+        className="relative rounded-2xl border transition-all duration-200 ease-out group-focus-visible:outline group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-yellow-400"
         style={{
           transform: isHovered
             ? `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) translateY(-4px)`
@@ -175,9 +159,9 @@ export default function GameCard({ game, progress }: GameCardProps) {
         )}
 
         {/* ─── Contenido inferior ─── */}
-        <div className="p-5 sm:p-6 pt-3">
+        <div className="p-5 pt-3 sm:p-6">
           {/* Description */}
-          <p className="text-xs leading-relaxed text-zinc-400 uppercase tracking-wide line-clamp-2">
+          <p className="line-clamp-2 text-xs uppercase leading-relaxed tracking-wide text-zinc-400">
             {game.short_description}
           </p>
 
@@ -214,15 +198,15 @@ export default function GameCard({ game, progress }: GameCardProps) {
             </p>
           )}
 
-          {/* Action button */}
+          {/* Action button visual */}
           <div className="mt-4">
             {isPlayable ? (
               <div
-                className="flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all duration-300"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all duration-300"
                 style={{
                   borderColor: accentColor,
                   color: isHovered ? '#000' : accentColor,
-                  backgroundColor: isHovered ? accentColor : 'transparent',
+                  backgroundColor: isHovered ? accentColor : `${accentColor}18`,
                   boxShadow: isHovered
                     ? `0 0 20px ${accentColor}66, 0 0 60px ${accentColor}22, inset 0 0 20px ${accentColor}22`
                     : `0 0 0px transparent`,
@@ -234,13 +218,45 @@ export default function GameCard({ game, progress }: GameCardProps) {
                 </svg>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.08] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <div className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/[0.08] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-500">
                 {statusInfo?.label || 'NO DISPONIBLE'}
               </div>
             )}
           </div>
         </div>
       </div>
-    </div>
+    </>
+  )
+
+  if (!isPlayable) {
+    return (
+      <div
+        ref={(node) => { cardRef.current = node }}
+        aria-label={`${game.name} no disponible`}
+        aria-disabled="true"
+        className="group relative w-full cursor-not-allowed text-left opacity-80 outline-none"
+        style={{ perspective: '1000px' }}
+        onMouseMove={handleMouseMove}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {cardContent}
+      </div>
+    )
+  }
+
+  return (
+    <a
+      ref={(node) => { cardRef.current = node }}
+      aria-label={`Jugar ${game.name}`}
+      className="group relative block w-full cursor-pointer touch-manipulation text-left outline-none transition-transform active:scale-[0.985]"
+      href={href}
+      style={{ perspective: '1000px' }}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {cardContent}
+    </a>
   )
 }
