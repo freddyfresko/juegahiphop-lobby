@@ -6,10 +6,13 @@ import { createGameClient } from '@/lib/sdk/game-container'
 import type { GameCatalogEntry } from '@/lib/types'
 import type {
   SessionContextPayload,
+  SaveProgressPayload,
   LoadProgressPayload,
-  RequestSavePayload,
+  UnlockAchievementPayload,
   CampaignRequestPayload,
-  AchievementUnlockedPayload,
+  SaveResultPayload,
+  ProgressDataPayload,
+  AchievementResultPayload,
   EndSessionPayload,
 } from '@/lib/sdk/types'
 import { createClient } from '@/lib/supabase/client'
@@ -18,7 +21,7 @@ import { createClient } from '@/lib/supabase/client'
 
 type ContainerState =
   | 'loading'       // Mostrando pantalla de carga, esperando game_ready
-  | 'handshake'     // Game listo, enviando contexto + progreso
+  | 'handshake'     // Game listo, enviando contexto
   | 'playing'       // Juego activo, visible
   | 'saving'        // Guardando progreso (breve)
   | 'error'         // Error fatal
@@ -56,7 +59,7 @@ export default function GameContainer({
   const supabase = createClient()
   const accentColor = game.accent_color ?? game.color
 
-  // ─── Helpers ───
+  // ─── Helpers de persistencia (el lobby es el CEREBRO) ───
 
   /** Crear sesión de juego en Supabase (solo si hay userId) */
   const startSession = useCallback(async (): Promise<string | null> => {
@@ -117,14 +120,18 @@ export default function GameContainer({
       .eq('id', sessionId)
   }, [supabase])
 
-  /** Guardar progreso del juego en Supabase (solo si hay userId) */
-  const saveProgress = useCallback(async (payload: RequestSavePayload) => {
+  /** Manejar solicitud de guardado del juego → persistir en Supabase */
+  const handleSaveProgress = useCallback(async (
+    payload: SaveProgressPayload & { _requestId?: string },
+  ): Promise<void> => {
+    const requestId = payload._requestId ?? ''
     if (!userId) {
-      // Modo invitado: confirmar al juego pero no persistir
-      gameClientRef.current?.sendSaveConfirmed()
+      // Modo invitado: confirmar pero no persistir
+      gameClientRef.current?.sendSaveResult({ requestId, success: true })
       return
     }
     try {
+      setState('saving')
       await supabase.from('game_state').upsert(
         {
           user_id: userId,
@@ -136,22 +143,31 @@ export default function GameContainer({
         },
         { onConflict: 'user_id, game_id' },
       )
-
-      // Incrementar contador de partidas
-      await supabase.rpc('increment_game_plays', {
-        p_user_id: userId,
-        p_game_id: slug,
-      })
-
-      gameClientRef.current?.sendSaveConfirmed()
+      gameClientRef.current?.sendSaveResult({ requestId, success: true })
     } catch (err) {
-      console.warn('[GameContainer] Error guardando progreso:', err)
+      gameClientRef.current?.sendSaveResult({
+        requestId,
+        success: false,
+        error: err instanceof Error ? err.message : 'Error desconocido',
+      })
+    } finally {
+      setState('playing')
     }
   }, [userId, slug, supabase])
 
-  /** Cargar progreso del juego desde Supabase (solo si hay userId) */
-  const loadProgress = useCallback(async (): Promise<LoadProgressPayload | null> => {
-    if (!userId) return null
+  /** Manejar solicitud de carga del juego → leer de Supabase */
+  const handleLoadProgress = useCallback(async (
+    payload: LoadProgressPayload & { _requestId?: string },
+  ): Promise<void> => {
+    const requestId = payload._requestId ?? ''
+    if (!userId) {
+      gameClientRef.current?.sendProgressData({
+        requestId,
+        success: true,
+        gameState: null,
+      })
+      return
+    }
     try {
       const { data } = await supabase
         .from('game_state')
@@ -160,24 +176,60 @@ export default function GameContainer({
         .eq('game_id', slug)
         .single()
 
-      if (!data) {
-        return {
-          schemaVersion: game.progress_schema_version ?? '1.0.0',
-          gameState: null,
-        }
-      }
+      const gameState = (data?.state as Record<string, unknown> | null) ?? null
+      const bestScore = data?.best_score ?? undefined
 
-      return {
+      gameClientRef.current?.sendProgressData({
+        requestId,
+        success: true,
+        gameState,
+        bestScore,
         schemaVersion: game.progress_schema_version ?? '1.0.0',
-        gameState: (data.state as Record<string, unknown>) ?? null,
-      }
+      })
     } catch {
-      return {
-        schemaVersion: game.progress_schema_version ?? '1.0.0',
+      gameClientRef.current?.sendProgressData({
+        requestId,
+        success: true,
         gameState: null,
-      }
+        schemaVersion: game.progress_schema_version ?? '1.0.0',
+      })
     }
   }, [userId, slug, supabase, game.progress_schema_version])
+
+  /** Manejar solicitud de logro desbloqueado → persistir en Supabase */
+  const handleUnlockAchievement = useCallback(async (
+    payload: UnlockAchievementPayload & { _requestId?: string },
+  ): Promise<void> => {
+    const requestId = payload._requestId ?? ''
+    if (!userId) {
+      gameClientRef.current?.sendAchievementResult({ requestId, success: true })
+      return
+    }
+    try {
+      const { error } = await supabase
+        .from('achievement_unlocks')
+        .insert({
+          user_id: userId,
+          achievement_id: payload.achievementId,
+          unlocked_at: new Date().toISOString(),
+        })
+
+      // Si ya existía (violación de unique constraint), ya estaba desbloqueado
+      const alreadyUnlocked = error?.code === '23505'
+      gameClientRef.current?.sendAchievementResult({
+        requestId,
+        success: !error || alreadyUnlocked,
+        alreadyUnlocked,
+        error: error && !alreadyUnlocked ? error.message : undefined,
+      })
+    } catch (err) {
+      gameClientRef.current?.sendAchievementResult({
+        requestId,
+        success: false,
+        error: err instanceof Error ? err.message : 'Error desconocido',
+      })
+    }
+  }, [userId, supabase])
 
   /** Volver al lobby */
   const handleBackToLobby = useCallback(() => {
@@ -209,29 +261,28 @@ export default function GameContainer({
 
       // 2b. Esperar game_ready (con validación de protocolo)
       try {
-        const readyPayload = await gameClient.ready
+        await gameClient.ready
         if (destroyed) return
 
         setState('handshake')
 
-        // 2c. Cargar progreso guardado
-        const progressPayload = await loadProgress()
-
-        // 2d. Preparar contexto de sesión
+        // 2c. Preparar contexto de sesión
         let displayName = 'Invitado'
         let avatarUrl: string | undefined
         let level = 1
+        let xp = 0
 
         if (userId) {
           const { data: { user } } = await supabase.auth.getUser()
           const { data: profile } = await supabase
             .from('player_profiles')
-            .select('display_name, avatar_url, level')
+            .select('display_name, avatar_url, level, xp')
             .eq('user_id', userId)
             .single()
           displayName = (profile as { display_name?: string })?.display_name ?? user?.email?.split('@')[0] ?? 'Invitado'
           avatarUrl = (profile as { avatar_url?: string })?.avatar_url
           level = (profile as { level?: number })?.level ?? 1
+          xp = (profile as { xp?: number })?.xp ?? 0
         }
 
         const sessionContext: SessionContextPayload = {
@@ -239,19 +290,17 @@ export default function GameContainer({
           displayName,
           avatarUrl,
           level,
+          xp,
           locale: 'es-CL',
           isGuest: !userId,
           sessionId: sessionId ?? '',
           capabilities: game.capabilities,
         }
 
-        // 2e. Enviar contexto + progreso al juego
+        // 2d. Enviar contexto al juego
         gameClient.sendSessionContext(sessionContext)
-        if (progressPayload) {
-          gameClient.sendLoadProgress(progressPayload)
-        }
 
-        // 2f. ¡Juego activo!
+        // 2e. ¡Juego activo!
         setState('playing')
       } catch (err) {
         if (destroyed) return
@@ -287,38 +336,25 @@ export default function GameContainer({
       // Future: overlay de puntaje en vivo
     })
 
-    gameClient.onRequestSave(async (payload) => {
-      setState('saving')
-      await saveProgress(payload)
-      setState('playing')
-    })
+    // ── Persistencia: el juego le pide al lobby que guarde ──
+    gameClient.onSaveProgress((payload) => handleSaveProgress(payload))
+
+    // ── Persistencia: el juego le pide al lobby que cargue ──
+    gameClient.onLoadProgress((payload) => handleLoadProgress(payload))
+
+    // ── Logros: el juego le pide al lobby que registre ──
+    gameClient.onUnlockAchievement((payload) => handleUnlockAchievement(payload))
 
     gameClient.onCampaignRequest((payload: CampaignRequestPayload) => {
-      console.log('[GameContainer] Campaign request:', payload.placement)
+      const requestId = (payload as unknown as { _requestId?: string })._requestId ?? ''
       gameClient.sendCampaignResponse({
-        requestId: (payload as unknown as { requestId: string }).requestId ?? 'unknown',
+        requestId,
         status: 'unavailable',
         message: 'Campaign Manager no implementado aún',
       })
     })
 
-    gameClient.onAchievementUnlocked(async (payload: AchievementUnlockedPayload) => {
-      if (!userId) return // Invitado: no registrar logros
-      try {
-        await supabase.from('achievement_unlocks').insert({
-          user_id: userId,
-          achievement_id: payload.achievementId,
-          unlocked_at: new Date().toISOString(),
-        })
-      } catch (err) {
-        console.warn('[GameContainer] Error registrando logro:', err)
-      }
-    })
-
     gameClient.onExitGame(async (payload) => {
-      if (payload?.saveBeforeExit) {
-        // El juego debería enviar request_save antes
-      }
       await endSession(payload?.reason === 'completed' ? 'completed' : 'abandoned')
       handleBackToLobby()
     })

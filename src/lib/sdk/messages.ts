@@ -121,11 +121,14 @@ export function connectGameCallbacks(
       case 'jh:session_context':
         handlers.onSessionContext?.(msg.payload as never)
         break
-      case 'jh:load_progress':
-        handlers.onLoadProgress?.(msg.payload as never)
+      case 'jh:progress_data':
+        handlers.onProgressData?.(msg.payload as never)
         break
-      case 'jh:save_confirmed':
-        handlers.onSaveConfirmed?.(msg.payload)
+      case 'jh:save_result':
+        handlers.onSaveResult?.(msg.payload as never)
+        break
+      case 'jh:achievement_result':
+        handlers.onAchievementResult?.(msg.payload as never)
         break
       case 'jh:campaign_response':
         handlers.onCampaignResponse?.(msg.payload as never)
@@ -173,14 +176,17 @@ export function connectLobbyCallbacks(
       case 'jh:error':
         handlers.onError?.(msg.payload as never)
         break
-      case 'jh:request_save':
-        handlers.onRequestSave?.(msg.payload as never)
+      case 'jh:save_progress':
+        handlers.onSaveProgress?.(msg.payload as never)
+        break
+      case 'jh:load_progress':
+        handlers.onLoadProgress?.(msg.payload as never)
+        break
+      case 'jh:unlock_achievement':
+        handlers.onUnlockAchievement?.(msg.payload as never)
         break
       case 'jh:campaign_request':
         handlers.onCampaignRequest?.(msg.payload as never)
-        break
-      case 'jh:achievement_unlocked':
-        handlers.onAchievementUnlocked?.(msg.payload as never)
         break
     }
   }, allowedOrigins)

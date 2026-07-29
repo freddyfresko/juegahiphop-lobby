@@ -6,6 +6,9 @@
  *
  * Cliente que se usa en el LOBBY para comunicarse con un juego
  * ejecutándose dentro de un iframe.
+ *
+ * El lobby es el CEREBRO: recibe solicitudes del juego (save, load,
+ * unlock achievement, campaign) y responde con confirmaciones.
  */
 
 import type { GameClientOptions } from './types'
@@ -18,17 +21,21 @@ import type {
   ScoreUpdatedPayload,
   ExitGamePayload,
   ErrorPayload,
-  RequestSavePayload,
-  CampaignRequestPayload,
-  AchievementUnlockedPayload,
-  SessionContextPayload,
+  SaveProgressPayload,
   LoadProgressPayload,
+  UnlockAchievementPayload,
+  CampaignRequestPayload,
+  SessionContextPayload,
+  SaveResultPayload,
+  ProgressDataPayload,
+  AchievementResultPayload,
   CampaignResponsePayload,
   EndSessionPayload,
   MessageCallback,
 } from './types'
 
 export interface GameClientInstance {
+  // ═══ Listeners: Game → Lobby ═══
   /** El juego está listo */
   onGameReady: (cb: MessageCallback<GameReadyPayload>) => void
   /** El juego empezó una partida */
@@ -43,23 +50,30 @@ export interface GameClientInstance {
   onExitGame: (cb: MessageCallback<ExitGamePayload>) => void
   /** Error desde el juego */
   onError: (cb: MessageCallback<ErrorPayload>) => void
+
+  // ═══ Solicitudes de persistencia: Game → Lobby ═══
   /** El juego solicita guardar progreso */
-  onRequestSave: (cb: MessageCallback<RequestSavePayload>) => void
+  onSaveProgress: (cb: MessageCallback<SaveProgressPayload>) => void
+  /** El juego solicita cargar progreso */
+  onLoadProgress: (cb: MessageCallback<LoadProgressPayload>) => void
+  /** El juego solicita registrar un logro */
+  onUnlockAchievement: (cb: MessageCallback<UnlockAchievementPayload>) => void
   /** El juego solicita campaña recompensada */
   onCampaignRequest: (cb: MessageCallback<CampaignRequestPayload>) => void
-  /** El juego notifica logro desbloqueado */
-  onAchievementUnlocked: (cb: MessageCallback<AchievementUnlockedPayload>) => void
 
-  // ═══ Lobby → Game ═══
+  // ═══ Respuestas: Lobby → Game ═══
+  /** Responder a save_progress */
+  sendSaveResult: (payload: SaveResultPayload) => void
+  /** Responder a load_progress */
+  sendProgressData: (payload: ProgressDataPayload) => void
+  /** Responder a unlock_achievement */
+  sendAchievementResult: (payload: AchievementResultPayload) => void
+  /** Responder a campaign_request */
+  sendCampaignResponse: (payload: CampaignResponsePayload) => void
 
+  // ═══ Contexto: Lobby → Game ═══
   /** Enviar contexto de sesión al juego (después de game_ready) */
   sendSessionContext: (payload: SessionContextPayload) => void
-  /** Enviar progreso guardado al juego */
-  sendLoadProgress: (payload: LoadProgressPayload) => void
-  /** Confirmar guardado exitoso */
-  sendSaveConfirmed: () => void
-  /** Responder a solicitud de campaña recompensada */
-  sendCampaignResponse: (payload: CampaignResponsePayload) => void
   /** Cerrar sesión de juego */
   sendEndSession: (payload?: EndSessionPayload) => void
   /** Pausar el juego */
@@ -113,6 +127,8 @@ export function createGameClient(
     if (!data || typeof data.type !== 'string' || !data.type.startsWith('jh:')) return
     if (data.source !== 'game') return
 
+    const requestId: string | undefined = data.requestId
+
     switch (data.type) {
       case MessageType.GAME_READY: {
         clearTimeout(readyTimer)
@@ -149,14 +165,17 @@ export function createGameClient(
       case MessageType.ERROR:
         errorCb.forEach((cb) => cb(data.payload as ErrorPayload))
         break
-      case MessageType.REQUEST_SAVE:
-        requestSaveCb.forEach((cb) => cb(data.payload as RequestSavePayload))
+      case MessageType.SAVE_PROGRESS:
+        saveProgressCb.forEach((cb) => cb({ ...(data.payload as SaveProgressPayload), _requestId: requestId } as SaveProgressPayload & { _requestId?: string }))
+        break
+      case MessageType.LOAD_PROGRESS:
+        loadProgressCb.forEach((cb) => cb({ ...(data.payload as LoadProgressPayload), _requestId: requestId } as LoadProgressPayload & { _requestId?: string }))
+        break
+      case MessageType.UNLOCK_ACHIEVEMENT:
+        unlockAchievementCb.forEach((cb) => cb({ ...(data.payload as UnlockAchievementPayload), _requestId: requestId } as UnlockAchievementPayload & { _requestId?: string }))
         break
       case MessageType.CAMPAIGN_REQUEST:
-        campaignRequestCb.forEach((cb) => cb(data.payload as CampaignRequestPayload))
-        break
-      case MessageType.ACHIEVEMENT_UNLOCKED:
-        achievementUnlockedCb.forEach((cb) => cb(data.payload as AchievementUnlockedPayload))
+        campaignRequestCb.forEach((cb) => cb({ ...(data.payload as CampaignRequestPayload), _requestId: requestId } as CampaignRequestPayload & { _requestId?: string }))
         break
     }
   }
@@ -194,11 +213,13 @@ export function createGameClient(
   let requestFullscreenCb: MessageCallback[] = []
   let exitGameCb: MessageCallback<ExitGamePayload>[] = []
   let errorCb: MessageCallback<ErrorPayload>[] = []
-  let requestSaveCb: MessageCallback<RequestSavePayload>[] = []
+  let saveProgressCb: MessageCallback<SaveProgressPayload>[] = []
+  let loadProgressCb: MessageCallback<LoadProgressPayload>[] = []
+  let unlockAchievementCb: MessageCallback<UnlockAchievementPayload>[] = []
   let campaignRequestCb: MessageCallback<CampaignRequestPayload>[] = []
-  let achievementUnlockedCb: MessageCallback<AchievementUnlockedPayload>[] = []
 
   const instance: GameClientInstance = {
+    // ═══ Listeners ═══
     onGameReady: (cb) => { gameReadyCb.push(cb) },
     onGameStarted: (cb) => { gameStartedCb.push(cb) },
     onGameCompleted: (cb) => { gameCompletedCb.push(cb) },
@@ -206,15 +227,19 @@ export function createGameClient(
     onRequestFullscreen: (cb) => { requestFullscreenCb.push(cb) },
     onExitGame: (cb) => { exitGameCb.push(cb) },
     onError: (cb) => { errorCb.push(cb) },
-    onRequestSave: (cb) => { requestSaveCb.push(cb) },
+    onSaveProgress: (cb) => { saveProgressCb.push(cb) },
+    onLoadProgress: (cb) => { loadProgressCb.push(cb) },
+    onUnlockAchievement: (cb) => { unlockAchievementCb.push(cb) },
     onCampaignRequest: (cb) => { campaignRequestCb.push(cb) },
-    onAchievementUnlocked: (cb) => { achievementUnlockedCb.push(cb) },
 
+    // ═══ Respuestas ═══
+    sendSaveResult: (payload) => sendToGame(MessageType.SAVE_RESULT, payload, payload.requestId),
+    sendProgressData: (payload) => sendToGame(MessageType.PROGRESS_DATA, payload, payload.requestId),
+    sendAchievementResult: (payload) => sendToGame(MessageType.ACHIEVEMENT_RESULT, payload, payload.requestId),
+    sendCampaignResponse: (payload) => sendToGame(MessageType.CAMPAIGN_RESPONSE, payload, payload.requestId),
+
+    // ═══ Contexto ═══
     sendSessionContext: (payload) => sendToGame(MessageType.SESSION_CONTEXT, payload),
-    sendLoadProgress: (payload) => sendToGame(MessageType.LOAD_PROGRESS, payload),
-    sendSaveConfirmed: () => sendToGame(MessageType.SAVE_CONFIRMED, undefined),
-    sendCampaignResponse: (payload) =>
-      sendToGame(MessageType.CAMPAIGN_RESPONSE, payload, payload.requestId),
     sendEndSession: (payload) => sendToGame(MessageType.END_SESSION, payload ?? { reason: 'navigate_away' }),
     sendPause: () => sendToGame(MessageType.PAUSE, undefined),
     sendResume: () => sendToGame(MessageType.RESUME, undefined),
@@ -234,9 +259,10 @@ export function createGameClient(
       requestFullscreenCb = []
       exitGameCb = []
       errorCb = []
-      requestSaveCb = []
+      saveProgressCb = []
+      loadProgressCb = []
+      unlockAchievementCb = []
       campaignRequestCb = []
-      achievementUnlockedCb = []
     },
   }
 

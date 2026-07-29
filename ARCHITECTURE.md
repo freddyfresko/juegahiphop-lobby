@@ -1,8 +1,12 @@
 # Arquitectura Definitiva — JuegaHipHop
 
-> **Versión:** 2.0.0  
+> **Versión:** 3.0.0  
 > **Última revisión:** Julio 2026  
 > **Propósito:** Plataforma de juegos hip hop escalable para decenas de títulos
+
+> **Modelo 3.0:** El Lobby es el CEREBRO. Los juegos son stateless.
+> El lobby administra el usuario, las sesiones, y persiste TODOS los datos
+> de cada juego. Los juegos no tocan Supabase directamente.
 
 ---
 
@@ -30,32 +34,33 @@
 ## 1. Filosofía
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    JUEGAHIPHOP                           │
-│                                                         │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────┐ │
-│   │  LOBBY   │  │ PUZZLE   │  │  SOPA    │  │FIGHTER│ │
-│   │ (Next 16)│  │(Next 15) │  │(Vite+React│  │(Phaser│ │
-│   │          │  │          │  │   +PWA)  │  │  +Vite│ │
-│   └────┬─────┘  └────┬─────┘  └────┬─────┘  └───┬───┘ │
-│        │              │             │            │      │
-│        └──────────────┴──────┬──────┴────────────┘      │
-│                              │                          │
-│                    ┌─────────▼─────────┐                │
-│                    │     SUPABASE      │                │
-│                    │  (único backend)  │                │
-│                    └───────────────────┘                │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    JUEGAHIPHOP                               │
+│                                                              │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────┐       │
+│   │  LOBBY   │  │ PUZZLE   │  │  SOPA    │  │FIGHTER│       │
+│   │ (Next 16)│  │(Next 15) │  │(Vite+React│  │(Phaser│       │
+│   │ CEREBRO  │  │ STATELESS│  │ STATELESS│  │STATELESS│     │
+│   └────┬─────┘  └────┬─────┘  └────┬─────┘  └───┬───┘       │
+│        │  postMessage │             │            │           │
+│        └──────────────┴──────┬──────┴────────────┘           │
+│                              │                               │
+│                    ┌─────────▼─────────┐                     │
+│                    │     SUPABASE      │                     │
+│                    │  (solo el lobby   │                     │
+│                    │   lo toca)        │                     │
+│                    └───────────────────┘                     │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### Principios rectores
 
-1. **Cada juego es su propio proyecto** — repositorio, ciclo de desarrollo y despliegue independientes. Sin dependencias cruzadas.
-2. **Supabase es el único backend** — auth, PostgreSQL, RLS, Edge Functions, Storage. Firebase solo para frontends (hosting).
-3. **Catálogo dinámico** — los juegos se registran en Supabase; el lobby los descubre automáticamente sin cambiar código.
-4. **Comunicación estandarizada** — SDK compartido exclusivamente para comunicación Lobby ↔ Juego vía postMessage.
-5. **Autonomía total de cada juego** — cada juego funciona completo por sí solo, tanto dentro del iframe como abierto directamente en su propia URL. No depende del lobby para nada.
-6. **Local-first, Supabase como backup** — cada juego usa localStorage como source of truth y sincroniza con Supabase cuando hay sesión activa.
+1. **El Lobby es el cerebro** — administra el usuario, las sesiones, y persiste todos los datos de cada juego (progreso, scores, logros, completions). Los juegos son stateless desde el punto de vista del backend.
+2. **Cada juego es su propio proyecto** — repositorio, ciclo de desarrollo y despliegue independientes.
+3. **Supabase es el único backend** — auth, PostgreSQL, RLS, Edge Functions, Storage. El lobby es el único que habla con Supabase.
+4. **Catálogo dinámico** — los juegos se registran en Supabase; el lobby los descubre automáticamente sin cambiar código.
+5. **Comunicación estandarizada** — SDK compartido exclusivamente para comunicación Lobby ↔ Juego vía postMessage.
+6. **Los juegos no necesitan Supabase** — ni cliente, ni auth, ni persistencia. El juego le pide al lobby que guarde/cargue, y el lobby responde.
 
 ### ¿Qué NO es el lobby?
 
@@ -63,14 +68,15 @@
 ❌ No duplica lógica de juegos  
 ❌ No es un monolito  
 ❌ No tiene dependencias de los juegos  
-❌ No es necesario para que un juego funcione  
 
 ### ¿Qué SÍ es el lobby?
 
 ✅ Punto de entrada único a la plataforma  
 ✅ Catálogo dinámico de juegos  
-✅ Perfil y progreso del jugador  
+✅ Gestión de usuario y autenticación  
+✅ Persistencia de TODOS los datos de los juegos  
 ✅ Game Container para ejecutar juegos embedidos  
+✅ Administrador de sesiones, progreso, logros y completions  
 ✅ (Futuro) Rankings, logros, comunidad, eventos  
 
 ---
@@ -444,37 +450,41 @@ interface JuegaHipHopMessage {
 }
 ```
 
-### 7.3 Mensajes Game → Lobby (MVP)
+### 7.3 Mensajes Game → Lobby
+
+#### Ciclo de vida (fire-and-forget)
 
 | Tipo | Cuándo | Payload |
 |------|--------|---------|
 | `jh:game_ready` | El juego terminó de cargar | `{ version: string }` |
-| `jh:game_started` | El usuario empezó una partida | `{ sessionId?: string }` |
-| `jh:game_completed` | Partida terminada | `{ score, itemId?, difficulty?, metadata? }` |
+| `jh:game_started` | El usuario empezó una partida | `{ sessionId?, levelId?, difficulty? }` |
+| `jh:game_completed` | Partida terminada | `{ score, itemId?, difficulty?, timeSpent?, completed?, metadata? }` |
 | `jh:score_updated` | Puntaje cambió en vivo | `{ score, progress? }` |
 | `jh:request_fullscreen` | El juego pide pantalla completa | — |
-| `jh:exit_game` | El juego solicita volver al lobby | `{ reason?: string }` |
+| `jh:exit_game` | El juego solicita volver al lobby | `{ reason?, saveBeforeExit? }` |
 | `jh:error` | Error en el juego | `{ code, message, fatal }` |
 
-### 7.4 Mensajes Lobby → Game (MVP)
+#### Persistencia (request/response — devuelven promesa)
+
+| Tipo | Cuándo | Payload | Respuesta |
+|------|--------|---------|-----------|
+| `jh:save_progress` | El juego quiere guardar estado | `{ gameState, score?, metadata? }` | `jh:save_result` |
+| `jh:load_progress` | El juego quiere cargar estado guardado | `{ schemaVersion? }` | `jh:progress_data` |
+| `jh:unlock_achievement` | El juego desbloquea un logro | `{ achievementId, metadata? }` | `jh:achievement_result` |
+| `jh:campaign_request` | El juego pide campaña recompensada | `{ placement, rewardIds, metadata? }` | `jh:campaign_response` |
+
+### 7.4 Mensajes Lobby → Game
 
 | Tipo | Cuándo | Payload |
 |------|--------|---------|
+| `jh:session_context` | Después de game_ready — contexto del usuario | `{ userId, displayName?, avatarUrl?, level?, xp?, locale?, isGuest, sessionId, capabilities? }` |
+| `jh:save_result` | Respuesta a save_progress | `{ requestId, success, error? }` |
+| `jh:progress_data` | Respuesta a load_progress | `{ requestId, success, gameState, bestScore?, schemaVersion?, error? }` |
+| `jh:achievement_result` | Respuesta a unlock_achievement | `{ requestId, success, alreadyUnlocked?, xpAwarded?, error? }` |
+| `jh:campaign_response` | Respuesta a campaign_request | `{ requestId, status, campaignId?, rewardedIds?, message? }` |
 | `jh:pause` | El lobby pausa el juego | — |
 | `jh:resume` | El lobby reanuda el juego | — |
-
-> **NOTA:** En el MVP no hay mensajes de auth. Los juegos manejan su propia autenticación de forma independiente. La autenticación unificada se evaluará como fase posterior (ver sección 8).
-
-### 7.5 Mensajes FUTUROS (post-MVP)
-
-Cuando se implemente autenticación unificada y otras features, se agregarán:
-
-| Tipo | Dirección | Cuándo |
-|------|-----------|--------|
-| `jh:auth_token` | Lobby → Game | Post-MVP: solo accessToken (corta duración). Sin refreshToken |
-| `jh:achievement_unlocked` | Game → Lobby | Post-MVP: logros cross-game |
-| `jh:load_state` | Lobby → Game | Post-MVP: sincronización estado guardado |
-| `jh:set_volume` | Lobby → Game | Post-MVP: volumen global |
+| `jh:end_session` | El lobby cierra la sesión | `{ reason? }` |
 
 ### 7.6 Uso dentro del juego (iframe)
 
@@ -513,52 +523,36 @@ gameClient.onExitGame(() => { /* volver al lobby */ })
 
 ---
 
-## 8. Auth Flow (MVP)
+## 8. Auth Flow
 
-### 8.1 Principio: autonomía de cada juego
+### 8.1 Principio: el lobby gestiona la auth
 
-En el MVP, **cada juego maneja su propia autenticación de forma completamente independiente.**
+En el modelo 3.0, **el lobby es el único que maneja la autenticación.**
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
-│                           PRINCIPIO                               │
-│                                                                   │
-│  El lobby tiene su propia sesión Supabase (SSR con cookies).     │
-│  Cada juego tiene su propia sesión Supabase (localStorage/anónima).│
-│                                                                   │
-│  NO comparten sesión en el MVP.                                  │
-│  NO se pasan tokens por postMessage.                             │
-│  NO se asume que las cookies SSR funcionan entre subdominios.    │
-│                                                                   │
-│  Cada proyecto es autónomo e independiente.                      │
+│                           PRINCIPIO                                │
+│                                                                    │
+│  El lobby tiene su sesión Supabase (SSR con cookies).             │
+│  El lobby envía el contexto de sesión al juego vía postMessage.    │
+│  Los juegos NO tienen cliente Supabase ni manejan auth.            │
+│  Los juegos NO ven tokens ni credenciales.                         │
+│                                                                    │
+│  El juego recibe: userId, displayName, avatarUrl, level, isGuest. │
+│  Si isGuest=true, el juego funciona en modo demostración.         │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-### 8.2 Cómo funciona en el MVP
+### 8.2 Cómo funciona
 
-| Componente | Auth | Método |
-|-----------|------|--------|
-| **Lobby** | Supabase Auth SSR | Cookies propias (ya implementado) |
-| **PuzzleHH** | Supabase Auth (@supabase/supabase-js) | Propia sesión (ya implementado) |
-| **SopaDeltas** | Supabase Auth (@supabase/supabase-js) | Propia sesión (ya implementado) |
-| **HHFighters** | Supabase Auth (@supabase/supabase-js) | Propia sesión (ya implementado) |
+1. El usuario se autentica en el lobby (login/Google)
+2. El lobby crea el iframe del juego
+3. El juego envía `jh:game_ready`
+4. El lobby responde con `jh:session_context` (userId, displayName, avatarUrl, level, isGuest, sessionId)
+5. El juego usa esos datos para personalizar la experiencia
+6. Si el usuario no está autenticado → `isGuest: true` → el juego funciona en modo demo
 
-Si el usuario abre un juego desde el iframe del lobby, el juego:
-1. Carga su propia página (sin depender del lobby)
-2. Inicializa su propio cliente Supabase
-3. Si hay sesión guardada en localStorage → la usa
-4. Si no → muestra login propio o modo anónimo
-
-### 8.3 Futuro: auth unificada (post-MVP)
-
-La autenticación unificada se evaluará como fase independiente después de que el MVP esté estable. Cuando se implemente:
-
-1. Se investigará si las cookies de `.juegahiphop.cl` funcionan entre subdominios
-2. Si no, se implementará un puente postMessage que pase **solo el accessToken** (corta duración, sin refreshToken)
-3. Se probará exhaustivamente en todos los navegadores objetivo
-4. Mientras tanto, cada juego mantiene su propia sesión
-
-> No se asume nada sobre auth compartida. Primero funciona, después unificamos.
+> Los juegos NO necesitan cliente Supabase, ni OAuth, ni manejo de sesión. Solo usan el contexto que el lobby les envía.
 
 ---
 
@@ -575,42 +569,49 @@ LOBBY (juegahiphop.cl)              JUEGO (fighters.juegahiphop.cl)
 │    → valida external_url               │
 │    → crea iframe con sandbox+allow     │
 │                                        │
-│ 3.                              iframe carga en fighters.juegahiphop.cl
-│                                  El juego arranca de forma autónoma
-│                                  Inicializa su propio Supabase
-│                                  Lee su propio localStorage
+│ 3.                              iframe carga
+│                                  El juego arranca (stateless)
+│                                  No inicializa Supabase
+│                                  No maneja auth
 │                                        │
 │ 4.                           ←── jh:game_ready ──
 │                                        │
-│ 5. Lobby oculta pantalla de carga     │
+│ 5. Lobby crea sesión en Supabase       │
+│    Lobby consulta perfil del jugador   │
+│    Lobby envía contexto + progreso:    │
+│        ── jh:session_context ──→        │
+│        ── jh:progress_data ───→        │
 │                                        │
 │ 6.                      ═════ JUEGO ═══
-│                      (el usuario juega normalmente)
-│                      El juego lee/escribe Supabase directamente
-│                      (game_state, game_completions)
-│                      Sin intermediación del lobby
+│                      (el usuario juega)
+│                      El juego guarda/carga
+│                      vía postMessage al lobby
 │                                        │
-│ 7.                           ←── jh:game_completed ──
-│     (score, itemId, difficulty)        │
+│ 7.                           ←── jh:save_progress ──
+│    Lobby escribe game_state en Supabase │
+│        ── jh:save_result ──────→        │
 │                                        │
-│ 8. Lobby opcionalmente refresca        │
-│    datos de Supabase                   │
+│ 8.                           ←── jh:game_completed ──
+│    Lobby escribe game_completions       │
+│    Lobby actualiza player_profiles      │
 │                                        │
-│ 9.                           ←── jh:exit_game ──
-│     (o usuario hace clic en Volver)    │
+│ 9.                           ←── jh:unlock_achievement ──
+│    Lobby escribe achievement_unlocks    │
+│        ── jh:achievement_result ─→      │
 │                                        │
-│ 10. Lobby destruye iframe              │
-│     → redirige a /                     │
-│                                        │
+│10.                           ←── jh:exit_game ──
+│    Lobby cierra sesión en Supabase      │
+│    → redirige a /                       │
 ```
 
 ### Puntos clave
 
-- **El juego escribe directamente a Supabase.** No pasa por el lobby. Es completamente autónomo.
-- **El lobby lee el progreso desde Supabase** (game_state) después de `game_completed` para mostrar datos actualizados.
-- **postMessage es solo para UX** (transiciones, loading, overlay). No transporta datos persistentes ni credenciales.
-- **El juego funciona idéntico dentro del iframe o abierto directamente.** No hay código condicional del tipo "if inside iframe".
-- **Sin dependencia del lobby para operar.** Si el iframe falla, el juego sigue vivo en su propia URL.
+- **El juego NUNCA toca Supabase.** Todo va por postMessage al lobby.
+- **El lobby persiste todo.** game_state, game_completions, achievement_unlocks, game_sessions.
+- **El juego es stateless.** No tiene cliente Supabase, no maneja auth, no persiste nada localmente (puede usar localStorage como cache temporal, pero el lobby es la fuente de verdad).
+- **postMessage transporta las solicitudes de persistencia.** El juego le pide al lobby que guarde/cargue, y el lobby responde con confirmaciones.
+- **El juego funciona dentro del iframe.** No hay código condicional del tipo "if inside iframe".
+- **SDK con request/response.** saveProgress, loadProgress, unlockAchievement devuelven promesas que se resuelven cuando el lobby confirma.
 
 ---
 
@@ -892,8 +893,11 @@ VITE_SUPABASE_ANON_KEY=...
 
 ### 14.5 Juegos
 
-- Cada juego mantiene **sus propios clientes Supabase** y su propia lógica de sync
-- No dependen del lobby para autenticarse, guardar o cargar datos
+- Los juegos son **stateless** desde el punto de vista del backend
+- **NO tienen cliente Supabase** ni manejan auth
+- Persistencia: el juego le pide al lobby que guarde/cargue vía postMessage (SDK)
+- El lobby es la fuente de verdad para todos los datos del juego
+- Puede usar localStorage como cache temporal, pero el lobby es la verdad
 - No hay código condicional del tipo `if (window.parent !== window)` dentro del juego
 
 ---

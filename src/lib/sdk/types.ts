@@ -7,6 +7,10 @@
  * Define el formato estándar de todos los mensajes intercambiados
  * entre el Lobby y los juegos mediante postMessage.
  *
+ * Modelo: el Lobby es el CEREBRO — el único que toca Supabase.
+ * Los juegos son stateless desde el punto de vista del backend.
+ * Toda lectura/escritura de datos va por postMessage al lobby.
+ *
  * Convención:
  * - Todos los tipos de mensaje usan prefijo "jh:" (JuegaHipHop)
  * - source identifica al emisor ('lobby' | 'game')
@@ -17,7 +21,7 @@
 
 // ─── Versión del protocolo ───
 
-export const PROTOCOL_VERSION = '1.0.0'
+export const PROTOCOL_VERSION = '2.0.0'
 
 // ─── Formato base de cualquier mensaje ───
 
@@ -36,7 +40,7 @@ export interface JuegaHipHopMessage<T = unknown> {
 // ─── Tipos de mensaje ───
 
 export const MessageType = {
-  // ═══ Game → Lobby ═══
+  // ═══ Game → Lobby: Ciclo de vida ═══
   /** El juego terminó de cargar y está listo */
   GAME_READY: 'jh:game_ready',
   /** El usuario empezó una partida */
@@ -51,33 +55,43 @@ export const MessageType = {
   EXIT_GAME: 'jh:exit_game',
   /** Error desde el juego */
   ERROR: 'jh:error',
-  /** El juego solicita que se guarde el progreso actual */
-  REQUEST_SAVE: 'jh:request_save',
+
+  // ═══ Game → Lobby: Persistencia (lobby = cerebro) ═══
+  /** El juego solicita guardar su estado completo */
+  SAVE_PROGRESS: 'jh:save_progress',
+  /** El juego solicita cargar su estado guardado */
+  LOAD_PROGRESS: 'jh:load_progress',
+  /** El juego solicita registrar un logro desbloqueado */
+  UNLOCK_ACHIEVEMENT: 'jh:unlock_achievement',
   /** El juego solicita visualizar una campaña recompensada */
   CAMPAIGN_REQUEST: 'jh:campaign_request',
-  /** El juego notifica un logro desbloqueado */
-  ACHIEVEMENT_UNLOCKED: 'jh:achievement_unlocked',
 
-  // ═══ Lobby → Game ═══
+  // ═══ Lobby → Game: Respuestas a solicitudes ═══
+  /** Respuesta a save_progress (éxito/error) */
+  SAVE_RESULT: 'jh:save_result',
+  /** Respuesta a load_progress (datos guardados) */
+  PROGRESS_DATA: 'jh:progress_data',
+  /** Respuesta a unlock_achievement (éxito/error) */
+  ACHIEVEMENT_RESULT: 'jh:achievement_result',
+  /** Respuesta a campaign_request */
+  CAMPAIGN_RESPONSE: 'jh:campaign_response',
+
+  // ═══ Lobby → Game: Contexto y control ═══
+  /** Contexto de sesión: perfil, progreso, configuración */
+  SESSION_CONTEXT: 'jh:session_context',
+  /** Confirmación de guardado exitoso (legacy — usar SAVE_RESULT) */
+  SAVE_CONFIRMED: 'jh:save_confirmed',
   /** Pausar el juego */
   PAUSE: 'jh:pause',
   /** Reanudar el juego */
   RESUME: 'jh:resume',
-  /** Contexto de sesión: perfil, progreso, configuración */
-  SESSION_CONTEXT: 'jh:session_context',
-  /** Cargar progreso guardado en el juego */
-  LOAD_PROGRESS: 'jh:load_progress',
-  /** Confirmación de guardado exitoso */
-  SAVE_CONFIRMED: 'jh:save_confirmed',
-  /** Respuesta a una solicitud de campaña recompensada */
-  CAMPAIGN_RESPONSE: 'jh:campaign_response',
   /** El lobby cierra la sesión de juego */
   END_SESSION: 'jh:end_session',
 } as const
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType]
 
-// ─── Payloads específicos ───
+// ─── Payloads Game → Lobby ═══
 
 /** El juego anuncia que está listo */
 export interface GameReadyPayload {
@@ -128,13 +142,28 @@ export interface ErrorPayload {
   fatal: boolean
 }
 
-/** El juego solicita guardar progreso */
-export interface RequestSavePayload {
-  /** Estado completo del juego (opaco para el lobby) */
+// ─── Persistencia: Game → Lobby ═══
+
+/** El juego solicita guardar su estado completo */
+export interface SaveProgressPayload {
+  /** Estado completo del juego (opaco para el lobby — se guarda como JSONB) */
   gameState: Record<string, unknown>
-  /** Puntaje a registrar */
+  /** Puntaje a registrar como best_score */
   score?: number
-  /** Metadatos adicionales */
+  /** Metadatos adicionales (estadísticas, configuración, etc.) */
+  metadata?: Record<string, unknown>
+}
+
+/** El juego solicita cargar su estado guardado */
+export interface LoadProgressPayload {
+  /** Versión del esquema que el juego espera (para migración) */
+  schemaVersion?: string
+}
+
+/** El juego solicita registrar un logro desbloqueado */
+export interface UnlockAchievementPayload {
+  achievementId: string
+  /** Metadatos adicionales (puntaje, nivel, etc.) */
   metadata?: Record<string, unknown>
 }
 
@@ -148,43 +177,46 @@ export interface CampaignRequestPayload {
   metadata?: Record<string, unknown>
 }
 
-/** Notificación de logro desbloqueado */
-export interface AchievementUnlockedPayload {
-  achievementId: string
-  /** Metadatos adicionales (puntaje, nivel, etc.) */
-  metadata?: Record<string, unknown>
+// ─── Respuestas: Lobby → Game ═══
+
+/** Respuesta del lobby a save_progress */
+export interface SaveResultPayload {
+  /** Mismo requestId de la solicitud */
+  requestId: string
+  /** true si el guardado fue exitoso */
+  success: boolean
+  /** Mensaje de error si success=false */
+  error?: string
 }
 
-// ═══ Lobby → Game ───────────────────────
-
-/** Contexto de sesión enviado al juego después del handshake */
-export interface SessionContextPayload {
-  /** ID público del usuario (no el auth UUID completo) */
-  userId: string
-  /** Nombre visible del jugador */
-  displayName?: string
-  /** URL del avatar */
-  avatarUrl?: string
-  /** Nivel global del jugador */
-  level?: number
-  /** Idioma preferido */
-  locale?: string
-  /** Indica si el usuario es invitado */
-  isGuest: boolean
-  /** Sesión activa del juego (UUID) */
-  sessionId: string
-  /** Capacidades disponibles (suscripción, etc.) */
-  capabilities?: string[]
-}
-
-/** Datos de progreso enviados al juego al cargar */
-export interface LoadProgressPayload {
-  /** Versión del esquema de progreso */
-  schemaVersion: string
-  /** Datos opacos del progreso (game_state) */
+/** Respuesta del lobby a load_progress (datos guardados) */
+export interface ProgressDataPayload {
+  /** Mismo requestId de la solicitud */
+  requestId: string
+  /** true si la carga fue exitosa */
+  success: boolean
+  /** Datos del progreso guardado (null si no hay datos previos) */
   gameState: Record<string, unknown> | null
-  /** Configuración guardada del juego */
-  settings?: Record<string, unknown>
+  /** Mejor puntaje guardado */
+  bestScore?: number
+  /** Versión del esquema guardado */
+  schemaVersion?: string
+  /** Mensaje de error si success=false */
+  error?: string
+}
+
+/** Respuesta del lobby a unlock_achievement */
+export interface AchievementResultPayload {
+  /** Mismo requestId de la solicitud */
+  requestId: string
+  /** true si el logro fue registrado */
+  success: boolean
+  /** Si el logro ya estaba desbloqueado antes */
+  alreadyUnlocked?: boolean
+  /** XP otorgada al jugador */
+  xpAwarded?: number
+  /** Mensaje de error si success=false */
+  error?: string
 }
 
 /** Respuesta del lobby a una solicitud de campaña */
@@ -209,6 +241,32 @@ export type CampaignRewardStatus =
   | 'expired'
   | 'error'
 
+// ─── Contexto: Lobby → Game ═══
+
+/** Contexto de sesión enviado al juego después del handshake */
+export interface SessionContextPayload {
+  /** ID público del usuario (no el auth UUID completo) */
+  userId: string
+  /** Nombre visible del jugador */
+  displayName?: string
+  /** URL del avatar */
+  avatarUrl?: string
+  /** Nivel global del jugador */
+  level?: number
+  /** XP total del jugador */
+  xp?: number
+  /** Idioma preferido */
+  locale?: string
+  /** Indica si el usuario es invitado */
+  isGuest: boolean
+  /** Sesión activa del juego (UUID) */
+  sessionId: string
+  /** Capacidades disponibles (suscripción, etc.) */
+  capabilities?: string[]
+}
+
+// ─── Control: Lobby → Game ═══
+
 /** El lobby cierra la sesión */
 export interface EndSessionPayload {
   reason?: 'navigate_away' | 'timeout' | 'error' | 'user_logout'
@@ -224,15 +282,18 @@ export interface MessagePayloadMap {
   [MessageType.REQUEST_FULLSCREEN]: undefined
   [MessageType.EXIT_GAME]: ExitGamePayload
   [MessageType.ERROR]: ErrorPayload
-  [MessageType.REQUEST_SAVE]: RequestSavePayload
+  [MessageType.SAVE_PROGRESS]: SaveProgressPayload
+  [MessageType.LOAD_PROGRESS]: LoadProgressPayload
+  [MessageType.UNLOCK_ACHIEVEMENT]: UnlockAchievementPayload
   [MessageType.CAMPAIGN_REQUEST]: CampaignRequestPayload
-  [MessageType.ACHIEVEMENT_UNLOCKED]: AchievementUnlockedPayload
+  [MessageType.SAVE_RESULT]: SaveResultPayload
+  [MessageType.PROGRESS_DATA]: ProgressDataPayload
+  [MessageType.ACHIEVEMENT_RESULT]: AchievementResultPayload
+  [MessageType.CAMPAIGN_RESPONSE]: CampaignResponsePayload
+  [MessageType.SESSION_CONTEXT]: SessionContextPayload
+  [MessageType.SAVE_CONFIRMED]: undefined
   [MessageType.PAUSE]: undefined
   [MessageType.RESUME]: undefined
-  [MessageType.SESSION_CONTEXT]: SessionContextPayload
-  [MessageType.LOAD_PROGRESS]: LoadProgressPayload
-  [MessageType.SAVE_CONFIRMED]: undefined
-  [MessageType.CAMPAIGN_RESPONSE]: CampaignResponsePayload
   [MessageType.END_SESSION]: EndSessionPayload
 }
 
@@ -240,18 +301,19 @@ export interface MessagePayloadMap {
 
 export type MessageCallback<T = unknown> = (payload: T) => void
 
-/** Handlers que el juego (iframe) puede registrar */
+/** Handlers que el juego (iframe) puede registrar (eventos del lobby) */
 export interface GameEventHandlers {
   onPause?: MessageCallback
   onResume?: MessageCallback
   onSessionContext?: MessageCallback<SessionContextPayload>
-  onLoadProgress?: MessageCallback<LoadProgressPayload>
-  onSaveConfirmed?: MessageCallback
+  onProgressData?: MessageCallback<ProgressDataPayload>
+  onSaveResult?: MessageCallback<SaveResultPayload>
+  onAchievementResult?: MessageCallback<AchievementResultPayload>
   onCampaignResponse?: MessageCallback<CampaignResponsePayload>
   onEndSession?: MessageCallback<EndSessionPayload>
 }
 
-/** Handlers que el lobby puede registrar */
+/** Handlers que el lobby puede registrar (eventos del juego) */
 export interface LobbyEventHandlers {
   onGameReady?: MessageCallback<GameReadyPayload>
   onGameStarted?: MessageCallback<GameStartedPayload>
@@ -260,9 +322,10 @@ export interface LobbyEventHandlers {
   onRequestFullscreen?: MessageCallback
   onExitGame?: MessageCallback<ExitGamePayload>
   onError?: MessageCallback<ErrorPayload>
-  onRequestSave?: MessageCallback<RequestSavePayload>
+  onSaveProgress?: MessageCallback<SaveProgressPayload>
+  onLoadProgress?: MessageCallback<LoadProgressPayload>
+  onUnlockAchievement?: MessageCallback<UnlockAchievementPayload>
   onCampaignRequest?: MessageCallback<CampaignRequestPayload>
-  onAchievementUnlocked?: MessageCallback<AchievementUnlockedPayload>
 }
 
 // ─── Opciones de configuración ───
@@ -274,6 +337,8 @@ export interface LobbyClientOptions {
   readyTimeout?: number
   /** Capacidades del juego que se reportarán en game_ready */
   capabilities?: string[]
+  /** ID del juego (slug) */
+  gameId?: string
 }
 
 export interface GameClientOptions {
