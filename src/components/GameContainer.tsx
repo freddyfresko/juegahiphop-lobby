@@ -275,15 +275,41 @@ export default function GameContainer({
 
         if (userId) {
           const { data: { user } } = await supabase.auth.getUser()
-          const { data: profile } = await supabase
+          const { data: profile, error: profileErr } = await supabase
             .from('player_profiles')
             .select('display_name, avatar_url, level, xp')
             .eq('user_id', userId)
-            .single()
-          displayName = (profile as { display_name?: string })?.display_name ?? user?.email?.split('@')[0] ?? 'Invitado'
-          avatarUrl = (profile as { avatar_url?: string })?.avatar_url
-          level = (profile as { level?: number })?.level ?? 1
-          xp = (profile as { xp?: number })?.xp ?? 0
+            .maybeSingle()
+
+          // Si no existe el perfil (406 PGRST116 o profile === null),
+          // crearlo automaticamente para que futuras lecturas funcionen.
+          if (!profile && userId && !profileErr) {
+            const fallbackName = user?.email?.split('@')[0] ?? 'Jugador'
+            await supabase
+              .from('player_profiles')
+              .upsert({
+                user_id: userId,
+                display_name: fallbackName,
+                xp: 0,
+                level: 1,
+                total_games_completed: 0,
+                current_streak: 0,
+              }, { onConflict: 'user_id' })
+              .select('display_name, avatar_url, level, xp')
+              .maybeSingle()
+              .then(({ data: created }) => {
+                if (created) {
+                  displayName = (created as { display_name?: string }).display_name ?? fallbackName
+                  level = (created as { level?: number }).level ?? 1
+                  xp = (created as { xp?: number }).xp ?? 0
+                }
+              })
+          } else {
+            displayName = (profile as { display_name?: string })?.display_name ?? user?.email?.split('@')[0] ?? 'Invitado'
+            avatarUrl = (profile as { avatar_url?: string })?.avatar_url
+            level = (profile as { level?: number })?.level ?? 1
+            xp = (profile as { xp?: number })?.xp ?? 0
+          }
         }
 
         const sessionContext: SessionContextPayload = {

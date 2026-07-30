@@ -106,7 +106,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
             .from('player_profiles')
             .select('*')
             .eq('user_id', u.id)
-            .single(),
+            .maybeSingle(),
           supabase
             .from('game_state')
             .select('game_id, state, total_plays')

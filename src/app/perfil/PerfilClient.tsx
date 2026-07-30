@@ -30,7 +30,7 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
         .from('player_profiles')
         .select('*')
         .eq('user_id', userId)
-        .single(),
+        .maybeSingle(),
       supabase
         .from('achievement_unlocks')
         .select('*')
