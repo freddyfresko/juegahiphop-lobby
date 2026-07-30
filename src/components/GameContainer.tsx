@@ -55,6 +55,7 @@ export default function GameContainer({
   const [errorMsg, setErrorMsg] = useState<string>('')
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   const supabase = createClient()
   const accentColor = game.accent_color ?? game.color
@@ -131,7 +132,7 @@ export default function GameContainer({
       return
     }
     try {
-      setState('saving')
+      setIsSaving(true)
       await supabase.from('game_state').upsert(
         {
           user_id: userId,
@@ -151,7 +152,7 @@ export default function GameContainer({
         error: err instanceof Error ? err.message : 'Error desconocido',
       })
     } finally {
-      setState('playing')
+      setIsSaving(false)
     }
   }, [userId, slug, supabase])
 
@@ -487,7 +488,7 @@ export default function GameContainer({
           <span className="truncate font-archivo text-sm tracking-wide text-white">
             {game.name}
           </span>
-          {state === 'saving' && (
+          {isSaving && (
             <span className="text-[10px] uppercase tracking-wider text-zinc-500 animate-pulse">
               GUARDANDO…
             </span>
