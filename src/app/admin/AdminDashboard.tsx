@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useState, useCallback } from 'react'
 import { setGameStatus, deleteGame, reorderGames } from '@/lib/admin-actions'
 import BannerManager from './BannerManager'
+import Logo from '@/components/Logo'
 import type { GameCatalogEntry, Banner } from '@/lib/types'
 
 interface AdminDashboardProps {
@@ -77,11 +78,9 @@ export default function AdminDashboard({ games, banners, userEmail }: AdminDashb
       {/* ─── Top bar ─── */}
       <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-black/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2 group">
-            <svg className="h-4 w-4 text-yellow-400 transition-transform group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M2 19l2-12 4 3 4-5 4 5 4-3 2 12H2zM12 5l-3 4 3-1 3 1-3-4z"/>
-            </svg>
-            <span className="font-archivo text-base tracking-wide text-white">
+          <Link href="/" className="flex items-center gap-2 group" aria-label="Volver al lobby">
+            <Logo size="sm" />
+            <span className="font-archivo text-base tracking-wide text-yellow-400">
               ADMIN
             </span>
           </Link>

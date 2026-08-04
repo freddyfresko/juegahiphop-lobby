@@ -6,6 +6,7 @@ import { useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { PlayerProfile } from '@/lib/types'
 import Link from 'next/link'
+import Logo from '@/components/Logo'
 
 const NAV_ITEMS = [
   { label: 'HOME', href: '/' },
@@ -32,14 +33,9 @@ export default function Header({ user, profile, isAdmin }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-black md:bg-black/80 md:backdrop-blur-xl">
       <div className="safe-area-top mx-auto flex h-14 items-center justify-between px-4 sm:h-16 sm:px-6 lg:px-8">
-        {/* Logo + Crown */}
-        <Link href="/" className="group flex min-h-11 shrink-0 items-center gap-1.5">
-          <svg className="h-5 w-5 text-yellow-400 transition-transform group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M2 19l2-12 4 3 4-5 4 5 4-3 2 12H2zM12 5l-3 4 3-1 3 1-3-4z"/>
-          </svg>
-          <span className="font-archivo text-lg tracking-wide text-white transition-colors group-hover:text-yellow-400 sm:text-xl">
-            JUEGAHIPHOP
-          </span>
+        {/* Logo */}
+        <Link href="/" className="group flex min-h-11 shrink-0 items-center" aria-label="Juega Hip Hop — Inicio">
+          <Logo size="header" priority />
         </Link>
 
         {/* Desktop Nav */}

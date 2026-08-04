@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Header from '@/components/Header'
 import GameCard from '@/components/GameCard'
+import Logo from '@/components/Logo'
 import type { PlayerProfile, GameCatalogEntry, GameProgress, Banner } from '@/lib/types'
 import type { User } from '@supabase/supabase-js'
 
@@ -195,28 +196,25 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
 
           <div className="relative z-10 mx-auto max-w-4xl px-4 py-10 text-center sm:py-14">
             <div className="animate-fade-in">
-              {/* Crown icon */}
-              <svg className="mx-auto mb-3 h-10 w-10 text-yellow-400 sm:h-12 sm:w-12 animate-float" viewBox="0 0 24 24" fill={heroBanner?.accent_color || '#facc15'}>
-                <path d="M2 19l2-12 4 3 4-5 4 5 4-3 2 12H2zM12 5l-3 4 3-1 3 1-3-4z"/>
-              </svg>
+              {/* Logo oficial */}
+              <div className="mx-auto mb-4 flex justify-center animate-float">
+                <Logo size="xl" priority />
+              </div>
 
-              <h1
-                className="font-archivo text-4xl font-normal leading-none tracking-wide min-[380px]:text-5xl sm:text-6xl md:text-7xl lg:text-8xl"
-                style={{ color: heroBanner?.text_color || '#ffffff' }}
-              >
-                {heroBanner?.title?.split(' ').map((word, i) =>
-                  i === heroBanner.title.split(' ').length - 1 && heroBanner.title.split(' ').length > 1 ? (
-                    <span key={i} style={{ color: heroBanner?.accent_color || '#facc15' }}>{word}</span>
-                  ) : (
-                    <span key={i}>{word}{i < heroBanner.title.split(' ').length - 1 ? ' ' : ''}</span>
-                  )
-                ) || (
-                  <>
-                    JUEGA<br className="sm:hidden" />
-                    <span className="text-yellow-400">HIP HOP</span>
-                  </>
-                )}
-              </h1>
+              {heroBanner?.title && (
+                <h1
+                  className="font-archivo text-4xl font-normal leading-none tracking-wide min-[380px]:text-5xl sm:text-6xl md:text-7xl lg:text-8xl"
+                  style={{ color: heroBanner?.text_color || '#ffffff' }}
+                >
+                  {heroBanner.title.split(' ').map((word, i) =>
+                    i === heroBanner.title.split(' ').length - 1 && heroBanner.title.split(' ').length > 1 ? (
+                      <span key={i} style={{ color: heroBanner?.accent_color || '#facc15' }}>{word}</span>
+                    ) : (
+                      <span key={i}>{word}{i < heroBanner.title.split(' ').length - 1 ? ' ' : ''}</span>
+                    )
+                  )}
+                </h1>
+              )}
 
               {heroBanner?.subtitle && (
                 <p
@@ -340,9 +338,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
             <div className="grid gap-8 sm:grid-cols-3">
               <div className="text-center sm:text-left">
                 <div className="mb-3 flex justify-center sm:justify-start">
-                  <svg className="h-6 w-6 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M2 19l2-12 4 3 4-5 4 5 4-3 2 12H2zM12 5l-3 4 3-1 3 1-3-4z"/>
-                  </svg>
+                  <Logo size="sm" />
                 </div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                   El hip hop no es moda,<br />

@@ -1,4 +1,5 @@
 import AuthForm from '@/components/AuthForm'
+import Logo from '@/components/Logo'
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string; error_description?: string; reason?: string; view?: string }>
@@ -58,13 +59,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <div className="vignette brick-bg graffiti-spray flex min-h-dvh flex-col items-center justify-center px-4">
       <div className="relative z-10 w-full max-w-sm">
         {/* Logo */}
-        <div className="mb-8 text-center">
-          <svg className="mx-auto mb-3 h-8 w-8 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M2 19l2-12 4 3 4-5 4 5 4-3 2 12H2zM12 5l-3 4 3-1 3 1-3-4z"/>
-          </svg>
-          <h1 className="font-archivo text-3xl font-normal tracking-wide text-white sm:text-4xl">
-            JUEGA <span className="text-yellow-400">HIP HOP</span>
-          </h1>
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Logo size="md" priority />
           <p className="mt-2 text-xs uppercase tracking-[0.2em] text-zinc-500">
             Tu portal de juegos del hip hop
           </p>
