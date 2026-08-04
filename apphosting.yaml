@@ -1,0 +1,4 @@
+# Configuración Firebase App Hosting — Juega Hip Hop Lobby
+# Node 22 LTS (Node 24 retirado por Google)
+runConfig:
+  nodeVersion: 22
