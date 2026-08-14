@@ -16,6 +16,10 @@ import type {
   EndSessionPayload,
 } from '@/lib/sdk/types'
 import { createClient } from '@/lib/supabase/client'
+import { selectCampaign, trackImpression } from '@/lib/campaign-manager'
+import type { SelectedCampaign } from '@/lib/campaign-manager'
+import type { CampaignPlacement } from '@/lib/types'
+import AdOverlay, { type AdResult } from '@/components/AdOverlay'
 
 // ─── Estados del contenedor ───
 
@@ -56,6 +60,14 @@ export default function GameContainer({
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+
+  // ─── Ad Overlay state ───
+  const [activeAd, setActiveAd] = useState<{
+    campaign: SelectedCampaign
+    placement: CampaignPlacement
+    requestId: string
+    rewardIds: string[]
+  } | null>(null)
 
   const supabase = createClient()
   const accentColor = game.accent_color ?? game.color
@@ -372,13 +384,34 @@ export default function GameContainer({
     // ── Logros: el juego le pide al lobby que registre ──
     gameClient.onUnlockAchievement((payload) => handleUnlockAchievement(payload))
 
-    gameClient.onCampaignRequest((payload: CampaignRequestPayload) => {
+    gameClient.onCampaignRequest(async (payload: CampaignRequestPayload) => {
       const requestId = (payload as unknown as { _requestId?: string })._requestId ?? ''
-      gameClient.sendCampaignResponse({
-        requestId,
-        status: 'unavailable',
-        message: 'Campaign Manager no implementado aún',
+      const placement = (payload.placement as CampaignPlacement) ?? 'game_results'
+      const rewardIds = payload.rewardIds ?? []
+
+      // Buscar campaña activa para este placement + juego + usuario
+      const campaign = await selectCampaign(supabase, placement, slug, userId)
+
+      if (!campaign) {
+        // Sin campaña elegible → le decimos al juego que no hay ad
+        gameClient.sendCampaignResponse({
+          requestId,
+          status: 'unavailable',
+          message: 'No hay campañas activas para este placement',
+        })
+        return
+      }
+
+      // Registrar impresión (shown)
+      await trackImpression(supabase, campaign.id, 'shown', {
+        userId,
+        gameId: slug,
+        placement,
       })
+
+      // Mostrar el overlay (el juego se pausa implícitamente porque
+      // el overlay cubre toda la pantalla)
+      setActiveAd({ campaign, placement, requestId, rewardIds })
     })
 
     gameClient.onExitGame(async (payload) => {
@@ -486,6 +519,66 @@ export default function GameContainer({
       iframeRef.current.src = validatedUrl
     }
   }, [validatedUrl])
+
+  // ─── Ad Overlay completion ───
+
+  const handleAdComplete = useCallback(
+    async (result: AdResult) => {
+      const ad = activeAd
+      if (!ad) return
+      setActiveAd(null)
+
+      // Registrar el evento (clicked/dismissed/reward_granted/reward_expired)
+      const eventName =
+        result.outcome === 'clicked'
+          ? 'clicked'
+          : result.outcome === 'dismissed'
+            ? 'dismissed'
+            : result.outcome === 'reward_granted'
+              ? 'reward_granted'
+              : 'reward_expired'
+      await trackImpression(supabase, ad.campaign.id, eventName, {
+        userId,
+        gameId: slug,
+        placement: ad.placement,
+      })
+
+      // Responder al juego según el resultado
+      const gameClient = gameClientRef.current
+      if (!gameClient) return
+
+      if (result.outcome === 'reward_granted') {
+        gameClient.sendCampaignResponse({
+          requestId: ad.requestId,
+          status: 'approved',
+          campaignId: ad.campaign.id,
+          rewardedIds: ad.rewardIds,
+          message: 'Recompensa concedida',
+        })
+      } else if (result.outcome === 'clicked') {
+        gameClient.sendCampaignResponse({
+          requestId: ad.requestId,
+          status: 'approved',
+          campaignId: ad.campaign.id,
+          message: 'Click registrado',
+        })
+      } else if (result.outcome === 'reward_expired') {
+        gameClient.sendCampaignResponse({
+          requestId: ad.requestId,
+          status: 'cancelled',
+          message: 'El usuario no completó el ad recompensado',
+        })
+      } else {
+        // dismissed
+        gameClient.sendCampaignResponse({
+          requestId: ad.requestId,
+          status: 'rejected',
+          message: 'El usuario cerró el ad',
+        })
+      }
+    },
+    [activeAd, supabase, userId, slug],
+  )
 
   // ─── Render ───
 
@@ -624,6 +717,17 @@ export default function GameContainer({
           />
         )}
       </div>
+
+      {/* ─── Ad Overlay (interstitial / rewarded) ─── */}
+      {activeAd && (
+        <AdOverlay
+          campaign={activeAd.campaign}
+          placement={activeAd.placement}
+          gameId={slug}
+          userId={userId}
+          onComplete={handleAdComplete}
+        />
+      )}
 
       {/* ─── Exit confirmation dialog ─── */}
       {showExitConfirm && (

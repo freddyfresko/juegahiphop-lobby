@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { useState, useCallback } from 'react'
 import { setGameStatus, deleteGame, reorderGames } from '@/lib/admin-actions'
 import BannerManager from './BannerManager'
+import CampaignManager from './CampaignManager'
 import Logo from '@/components/Logo'
-import type { GameCatalogEntry, Banner } from '@/lib/types'
+import type { GameCatalogEntry, Banner, CampaignEntry } from '@/lib/types'
 
 interface AdminDashboardProps {
   games: GameCatalogEntry[]
   banners: Banner[]
+  campaigns: CampaignEntry[]
   userEmail: string
 }
 
@@ -24,7 +26,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: string; bg: string; t
 
 const STATUS_ORDER = ['coming_soon', 'beta', 'active', 'maintenance', 'hidden']
 
-export default function AdminDashboard({ games, banners, userEmail }: AdminDashboardProps) {
+export default function AdminDashboard({ games, banners, campaigns, userEmail }: AdminDashboardProps) {
   const router = useRouter()
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
@@ -274,6 +276,9 @@ export default function AdminDashboard({ games, banners, userEmail }: AdminDashb
 
         {/* ─── Banners Section ─── */}
         <BannerManager banners={banners} />
+
+        {/* ─── Campaigns / Ad Manager Section ─── */}
+        <CampaignManager campaigns={campaigns} games={games} />
 
         {/* ─── Stats footer ─── */}
         <div className="mt-8 border-t border-white/[0.04] pt-4 text-center">

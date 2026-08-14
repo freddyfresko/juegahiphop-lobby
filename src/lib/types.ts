@@ -244,6 +244,8 @@ export type CampaignProvider =
   | 'internal'
   | 'direct_sponsor'
   | 'google_ads'
+  | 'adinplay'
+  | 'nitropay'
   | 'mobile_ads'
   | 'future'
 

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import AdminDashboard from './AdminDashboard'
-import type { GameCatalogEntry, Banner } from '@/lib/types'
+import type { GameCatalogEntry, Banner, CampaignEntry } from '@/lib/types'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -55,10 +55,17 @@ export default async function AdminPage() {
     .select('*')
     .order('sort_order', { ascending: true })
 
+  // Cargar campañas (ads)
+  const { data: campaigns } = await supabase
+    .from('campaigns')
+    .select('*')
+    .order('created_at', { ascending: false })
+
   return (
     <AdminDashboard
       games={(games ?? []) as GameCatalogEntry[]}
       banners={(banners ?? []) as Banner[]}
+      campaigns={(campaigns ?? []) as CampaignEntry[]}
       userEmail={user.email}
     />
   )
