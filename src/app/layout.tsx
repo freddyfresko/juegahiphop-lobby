@@ -30,11 +30,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/icons/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/icons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icons/juegahiphop_512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icons/favicon-16x16.png?v=2', sizes: '16x16', type: 'image/png' },
+      { url: '/icons/favicon-32x32.png?v=2', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/juegahiphop_512.png?v=2', sizes: '512x512', type: 'image/png' },
     ],
-    shortcut: ['/icons/juegahiphop_512.png'],
+    shortcut: ['/icons/juegahiphop_512.png?v=2'],
     other: [
       { url: '/icons/ios-167x167.png', sizes: '167x167', type: 'image/png' },
       { url: '/icons/ios-152x152.png', sizes: '152x152', type: 'image/png' },
