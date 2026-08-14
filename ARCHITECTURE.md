@@ -288,6 +288,42 @@ CREATE INDEX idx_games_sort ON games(sort_order);
 
 Sin Edge Functions en el MVP. Se agregarán cuando se requiera lógica del lado del servidor (rankings, streaks, etc.).
 
+### 4.4 Tabla NUEVA: `game_events` (migración 00012) — telemetría por usuario
+
+```sql
+-- ============================================================
+-- game_events  — Telemetría cruda. Una fila por evento.
+-- Cada partida deja un rastro reconstruible:
+--   game_started → score_updated (throttle 5s) → game_completed
+-- También: achievement_unlocked, game_error, session_started
+-- ============================================================
+CREATE TABLE game_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,  -- NULL = invitado
+  session_id UUID REFERENCES game_sessions(id) ON DELETE CASCADE,
+  game_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,     -- 'game_started' | 'game_completed' | 'score_updated' | ...
+  event_data JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**RPCs de analytics (00012):**
+| RPC | Uso |
+|-----|-----|
+| `record_game_event(user, game, session, type, data)` | Registra cualquier evento (valida que sea del propio usuario) |
+| `update_session_score(session, score, playtime)` | Score en vivo con throttle (5s) — no cierra la sesión |
+| `finish_game_session(session, score, items, result, playtime, metadata)` | Cierra sesión + agrega best_score/playtime/completions a `game_state` + incrementa `total_games_completed` |
+| `close_session(session, result, duration)` | Cierre por sendBeacon (sin JWT) + suma playtime al aggregate |
+
+**Agregados por juego en `game_state`:** `total_playtime_seconds`, `completions_count`, `best_score`, `total_plays`, `last_played_at` — leídos por el perfil y las GameCards.
+
+### 4.5 Layout del lobby (rediseño con menú lateral)
+
+- `Sidebar.tsx` — menú lateral fijo en desktop (lg+, w-64) / drawer en móvil. Reemplaza a `Header` en Home y Perfil.
+- Home: hero compacto + stats rápidas del usuario + DESTACADOS (cards horizontales) + grid de portadas tipo póster con filtros por categoría.
+- GameCard: formato póster (aspect 4/5) donde la portada es protagonista; hover con zoom, glow del color del juego y botón JUGAR.
+
 ---
 
 ## 5. Flujo de navegación (MVP)

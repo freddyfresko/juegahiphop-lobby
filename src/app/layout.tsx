@@ -80,6 +80,12 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
     >
       <body className="min-h-dvh overflow-x-hidden bg-[#0a0a0a] font-inter text-white antialiased">
+        {/* Reglas críticas del rail lateral inline (inmunes a caché de CSS): el contenido
+            siempre corre al lado de la barra fija, en cualquier viewport. */}
+        <style>{`
+          .content-with-rail { padding-left: 3.5rem; }
+          @media (min-width: 64rem) { .content-with-rail { padding-left: 16rem; } }
+        `}</style>
         {children}
       </body>
     </html>

@@ -17,9 +17,12 @@ const STATUS_LABELS: Record<string, { label: string; icon: string }> = {
   maintenance: { label: 'EN MANTENCIÓN', icon: '🔧' },
 }
 
+/**
+ * Tarjeta tipo póster: la portada es la protagonista.
+ * Hover → zoom + glow del color del juego + botón JUGAR.
+ */
 export default function GameCard({ game, progress }: GameCardProps) {
   const cardRef = useRef<HTMLElement | null>(null)
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
   const [isHovered, setIsHovered] = useState(false)
   const [glowPos, setGlowPos] = useState({ x: 50, y: 50 })
 
@@ -28,35 +31,22 @@ export default function GameCard({ game, progress }: GameCardProps) {
   const accentColor = game.accent_color ?? game.color ?? '#7C3AED'
   const baseColor = game.color ?? '#7C3AED'
   const href = `/jugar/${game.slug}`
+  const hasCover = !!game.image_url
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
     const card = cardRef.current
     if (!card) return
-
     const rect = card.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
-
-    const centerX = rect.width / 2
-    const centerY = rect.height / 2
-    const tiltX = ((y - centerY) / centerY) * -6
-    const tiltY = ((x - centerX) / centerX) * 6
-    setTilt({ x: tiltX, y: tiltY })
-
     setGlowPos({
       x: (x / rect.width) * 100,
       y: (y / rect.height) * 100,
     })
   }, [])
 
-  const handleMouseLeave = useCallback(() => {
-    setTilt({ x: 0, y: 0 })
-    setIsHovered(false)
-  }, [])
-
-  const handleMouseEnter = useCallback(() => {
-    setIsHovered(true)
-  }, [])
+  const handleMouseEnter = useCallback(() => setIsHovered(true), [])
+  const handleMouseLeave = useCallback(() => setIsHovered(false), [])
 
   const progressPct = progress && progress.total > 0
     ? Math.min((progress.current / progress.total) * 100, 100)
@@ -64,165 +54,150 @@ export default function GameCard({ game, progress }: GameCardProps) {
 
   const cardContent = (
     <>
-      {/* ─── Glow background (sigue al mouse) ─── */}
+      {/* ─── Glow que sigue al mouse ─── */}
       <div
         className="pointer-events-none absolute -inset-[2px] rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
         style={{
-          background: `radial-gradient(400px circle at ${glowPos.x}% ${glowPos.y}%, ${accentColor}55 0%, transparent 70%)`,
+          background: `radial-gradient(420px circle at ${glowPos.x}% ${glowPos.y}%, ${accentColor}44 0%, transparent 70%)`,
           zIndex: 0,
         }}
       />
 
-      {/* ─── Card body ─── */}
+      {/* ─── Cuerpo de la tarjeta ─── */}
       <div
-        className="relative rounded-2xl border transition-all duration-200 ease-out group-focus-visible:outline group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-yellow-400"
+        className="relative overflow-hidden rounded-2xl border transition-all duration-300 ease-out group-focus-visible:outline group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-yellow-400"
         style={{
-          transform: isHovered
-            ? `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) translateY(-4px)`
-            : 'rotateX(0deg) rotateY(0deg) translateY(0px)',
-          borderColor: isHovered ? `${accentColor}66` : `${baseColor}22`,
-          background: isHovered
-            ? `linear-gradient(135deg, ${baseColor}22 0%, transparent 100%)`
-            : `linear-gradient(135deg, ${baseColor}12 0%, transparent 100%)`,
+          borderColor: isHovered ? `${accentColor}77` : 'rgba(255,255,255,0.06)',
           boxShadow: isHovered
-            ? `0 20px 60px rgba(0,0,0,0.5), 0 0 30px ${accentColor}22, inset 0 1px 0 ${accentColor}22`
-            : '0 4px 20px rgba(0,0,0,0.3)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+            ? `0 24px 70px rgba(0,0,0,0.6), 0 0 40px ${accentColor}2e, inset 0 1px 0 ${accentColor}2e`
+            : '0 6px 24px rgba(0,0,0,0.35)',
           zIndex: 1,
         }}
       >
-        {/* ─── Cover image ─── */}
-        {game.image_url && (
-          <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-2xl">
+        {/* ═══ Portada (aspecto póster) ═══ */}
+        <div className="relative aspect-[4/5] w-full overflow-hidden">
+          {hasCover ? (
             <img
               src={`${game.image_url}?v=${new Date(game.updated_at).getTime()}`}
               alt={game.name}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.08]"
               loading="lazy"
             />
-            {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/30 to-transparent" />
+          ) : (
+            /* Fallback artístico cuando no hay portada: gradiente + emoji gigante */
+            <div
+              className="flex h-full w-full items-center justify-center"
+              style={{
+                background: `radial-gradient(circle at 30% 20%, ${baseColor}33 0%, transparent 60%), linear-gradient(160deg, ${baseColor}26 0%, #0a0a0a 70%)`,
+              }}
+            >
+              <span
+                className="text-7xl drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)] transition-transform duration-500 group-hover:scale-125"
+                style={{ filter: `drop-shadow(0 0 30px ${accentColor}44)` }}
+              >
+                {game.emoji}
+              </span>
+            </div>
+          )}
 
-            {/* Status badge */}
-            {statusInfo && (
-              <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1 backdrop-blur-md">
-                <span className="text-xs">{statusInfo.icon}</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-400">
-                  {statusInfo.label}
+          {/* Gradiente base para legibilidad */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/20 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/50 via-transparent to-transparent" />
+
+          {/* Overlay hover con botón JUGAR */}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
+            <div
+              className="flex h-16 w-16 scale-75 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-100"
+              style={{
+                backgroundColor: `${accentColor}ee`,
+                boxShadow: `0 0 0 8px ${accentColor}22, 0 0 40px ${accentColor}88`,
+              }}
+            >
+              <svg className="ml-1 h-7 w-7 text-black" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Badge de estado */}
+          {statusInfo && (
+            <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1 backdrop-blur-md">
+              <span className="text-xs">{statusInfo.icon}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-400">
+                {statusInfo.label}
+              </span>
+            </div>
+          )}
+
+          {/* ═══ Info del juego sobre la portada ═══ */}
+          <div className="absolute inset-x-0 bottom-0 p-4 pt-14">
+            <h3
+              className="font-archivo text-xl leading-tight tracking-wide drop-shadow-lg"
+              style={{ color: accentColor }}
+            >
+              {game.name}
+            </h3>
+
+            {/* Categoría + estado */}
+            <div className="mt-1 flex items-center gap-2">
+              {game.category && game.category !== 'games' && (
+                <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-300 backdrop-blur-sm">
+                  {game.category}
                 </span>
-              </div>
-            )}
-
-            {/* Play overlay en hover */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-              <div
-                className="flex h-14 w-14 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-110"
-                style={{ backgroundColor: `${accentColor}dd` }}
-              >
-                <svg className="ml-0.5 h-6 w-6 text-black" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Bottom gradient para texto */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/60 to-transparent p-4 pt-12">
-              <h3
-                className="font-archivo text-lg tracking-wide"
-                style={{ color: accentColor }}
-              >
-                {game.name}
-              </h3>
+              )}
+              {game.status === 'beta' && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                  style={{ backgroundColor: `${accentColor}33`, color: accentColor }}
+                >
+                  Beta
+                </span>
+              )}
+              {isPlayable && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+                  ▶ JUGAR
+                </span>
+              )}
             </div>
           </div>
-        )}
+        </div>
 
-        {/* ─── Sin imagen ─── */}
-        {!game.image_url && (
-          <div className="p-5 sm:p-6">
-            <div className="mb-3 flex items-center gap-3">
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${accentColor}22` }}
-              >
-                <span className="text-xl">{game.emoji}</span>
-              </div>
-              <h3
-                className="font-archivo text-lg tracking-wide"
-                style={{ color: accentColor }}
-              >
-                {game.name}
-              </h3>
-            </div>
-          </div>
-        )}
-
-        {/* ─── Contenido inferior ─── */}
-        <div className="p-5 pt-3 sm:p-6">
-          {/* Description */}
-          <p className="line-clamp-2 text-xs uppercase leading-relaxed tracking-wide text-zinc-400">
+        {/* ═══ Pie: descripción + progreso ═══ */}
+        <div className="bg-[#0d0d0d] p-4">
+          <p className="line-clamp-2 text-[11px] uppercase leading-relaxed tracking-wide text-zinc-500">
             {game.short_description}
           </p>
 
-          {/* Progress bar */}
           {isPlayable && progress && progress.total > 0 && (
-            <div className="mt-4">
+            <div className="mt-3">
               <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-wider text-zinc-500">{progress.label}</span>
-                <span className="text-xs font-bold" style={{ color: accentColor }}>
+                <span className="text-[9px] uppercase tracking-wider text-zinc-600">{progress.label}</span>
+                <span className="text-[10px] font-bold" style={{ color: accentColor }}>
                   {progress.current}/{progress.total}
                 </span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+              <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
                 <div
                   className="h-full rounded-full transition-all duration-700 ease-out"
                   style={{
                     backgroundColor: accentColor,
                     width: `${progressPct}%`,
-                    boxShadow: isHovered ? `0 0 8px ${accentColor}66` : 'none',
+                    boxShadow: isHovered ? `0 0 10px ${accentColor}77` : 'none',
                   }}
                 />
               </div>
             </div>
           )}
 
-          {/* Release date */}
           {game.status === 'coming_soon' && game.release_date && (
             <p className="mt-3 text-[10px] uppercase tracking-wider text-yellow-500/60">
-              Disponible {new Date(game.release_date).toLocaleDateString('es-CL', {
+              Disponible{' '}
+              {new Date(game.release_date).toLocaleDateString('es-CL', {
                 day: 'numeric',
                 month: 'long',
-                year: 'numeric',
               })}
             </p>
           )}
-
-          {/* Action button visual */}
-          <div className="mt-4">
-            {isPlayable ? (
-              <div
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all duration-300"
-                style={{
-                  borderColor: accentColor,
-                  color: isHovered ? '#000' : accentColor,
-                  backgroundColor: isHovered ? accentColor : `${accentColor}18`,
-                  boxShadow: isHovered
-                    ? `0 0 20px ${accentColor}66, 0 0 60px ${accentColor}22, inset 0 0 20px ${accentColor}22`
-                    : `0 0 0px transparent`,
-                }}
-              >
-                <span>JUGAR</span>
-                <svg className="h-3.5 w-3.5 transition-transform group-hover:scale-110" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            ) : (
-              <div className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/[0.08] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                {statusInfo?.label || 'NO DISPONIBLE'}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </>
@@ -235,7 +210,6 @@ export default function GameCard({ game, progress }: GameCardProps) {
         aria-label={`${game.name} no disponible`}
         aria-disabled="true"
         className="group relative w-full cursor-not-allowed text-left opacity-80 outline-none"
-        style={{ perspective: '1000px' }}
         onMouseMove={handleMouseMove}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -251,7 +225,6 @@ export default function GameCard({ game, progress }: GameCardProps) {
       aria-label={`Jugar ${game.name}`}
       className="group relative block w-full cursor-pointer touch-manipulation text-left outline-none transition-transform active:scale-[0.985]"
       href={href}
-      style={{ perspective: '1000px' }}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

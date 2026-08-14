@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import Header from '@/components/Header'
+import Sidebar from '@/components/Sidebar'
 import GameCard from '@/components/GameCard'
 import Logo from '@/components/Logo'
 import Link from 'next/link'
@@ -47,6 +47,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
   const [loading, setLoading] = useState(initialGames.length === 0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<string>('todos')
 
   useEffect(() => {
     if (initialGames.length > 0) {
@@ -111,7 +112,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
             .maybeSingle(),
           supabase
             .from('game_state')
-            .select('game_id, state, total_plays')
+            .select('game_id, state, total_plays, best_score, total_playtime_seconds, completions_count')
             .eq('user_id', u.id),
           supabase
             .from('admin_users')
@@ -147,19 +148,38 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
   const availableGames = games.filter((g) => g.status === 'active' || g.status === 'beta')
   const comingSoonGames = games.filter((g) => g.status === 'coming_soon')
 
+  // Categorías únicas para filtros (ignorando el default 'games')
+  const categories = useMemo(() => {
+    const cats = new Set<string>()
+    for (const g of availableGames) {
+      if (g.category && g.category !== 'games') cats.add(g.category)
+    }
+    return Array.from(cats).sort()
+  }, [availableGames])
+
+  // Juegos destacados (featured) — cards horizontales grandes
+  const featuredGames = availableGames.filter((g) => g.featured)
+  const gridGames = featuredGames.length > 0
+    ? availableGames.filter((g) => !g.featured)
+    : availableGames
+
+  // Filtro por categoría
+  const visibleGrid = activeCategory === 'todos'
+    ? gridGames
+    : gridGames.filter((g) => g.category === activeCategory)
+
   // Banner activo (primero de la lista)
   const heroBanner = banners.length > 0 ? banners[0] : null
 
   return (
-    <div className="vignette brick-bg graffiti-spray flex min-h-dvh flex-col">
-      <div className="relative z-10 flex min-h-dvh flex-col">
-        <Header user={user} profile={profile} isAdmin={isAdmin} />
+    <div className="vignette brick-bg graffiti-spray min-h-dvh">
+      <Sidebar user={user} profile={profile} isAdmin={isAdmin} />
 
-        {/* ─── HERO SECTION ─── */}
-        <section className="relative flex min-h-[calc(100svh-3.5rem)] items-center justify-center overflow-hidden border-b border-white/[0.04] sm:min-h-[70vh]">
+      <div className="relative z-10 flex min-h-dvh flex-col content-with-rail">
+        {/* ─── HERO COMPACTO ─── */}
+        <section className="relative flex min-h-[300px] items-end overflow-hidden border-b border-white/[0.04] sm:min-h-[360px]">
           {heroBanner?.image_url && (
             <>
-              {/* Background image */}
               <div className="absolute inset-0">
                 <img
                   src={`${heroBanner.image_url}?v=${new Date(heroBanner.updated_at).getTime()}`}
@@ -167,232 +187,367 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                   className="h-full w-full object-cover"
                 />
               </div>
-              {/* Overlay */}
               <div
                 className="absolute inset-0"
                 style={{
-                  background: `linear-gradient(180deg, rgba(0,0,0,${heroBanner.overlay_opacity}) 0%, rgba(0,0,0,${Number(heroBanner.overlay_opacity) + 0.2}) 100%)`,
+                  background: `linear-gradient(180deg, rgba(0,0,0,${heroBanner.overlay_opacity}) 0%, rgba(0,0,0,${Number(heroBanner.overlay_opacity) + 0.3}) 100%)`,
                 }}
               />
             </>
           )}
 
-          {/* SVG decorations (only when no banner) */}
+          {/* Decoración SVG lateral (sin banner) */}
           {!heroBanner?.image_url && (
-            <>
-              <div className="pointer-events-none absolute bottom-0 left-0 hidden w-[280px] opacity-30 lg:block xl:w-[350px]">
-                <svg viewBox="0 0 280 500" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-full">
-                  <path d="M140 180 C120 180 100 190 90 210 C80 230 75 250 80 270 L70 320 C65 340 60 350 55 370 L50 410 C48 420 45 430 50 440 L55 455 L60 470 L65 480 L75 490 L90 500 L100 490 L95 475 L90 460 L85 440 L90 420 L100 380 L105 360 L110 340 L115 320 L118 300 C118 300 120 310 130 320 C140 330 150 335 155 340 L160 350 L158 370 L155 390 L150 420 L145 440 L140 460 L135 480 L140 500 L155 500 L160 480 L162 460 L165 440 L170 420 L175 390 L180 360 L185 340 L195 320 L210 300 L220 290 L225 280 L220 270 L210 265 L200 260 L195 250 L190 240 L185 230 L180 220 L175 210 L170 200 L165 190 L155 185 L150 180 Z" fill="currentColor" className="text-white/80"/>
-                  <circle cx="140" cy="140" r="55" fill="currentColor" className="text-white/80"/>
-                </svg>
-              </div>
-              <div className="pointer-events-none absolute bottom-0 right-0 hidden w-[250px] opacity-25 lg:block xl:w-[300px]">
-                <svg viewBox="0 0 250 500" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-full">
-                  <path d="M125 180 C110 180 95 185 85 200 C75 215 70 235 75 255 L65 300 C60 320 55 340 50 360 L45 390 C42 400 40 415 45 430 L50 445 L55 460 L65 475 L75 485 L90 495 L100 500 L105 490 L100 475 L95 455 L90 435 L95 410 L105 380 L110 355 L115 335 L120 315 L122 300 C122 300 125 310 135 320 C145 330 155 338 160 345 L165 355 L162 375 L158 395 L152 420 L148 440 L143 460 L140 480 L142 500 L158 500 L162 480 L165 460 L168 440 L172 420 L178 390 L182 365 L188 345 L198 325 L215 305 L225 295 L230 285 L225 275 L215 268 L205 262 L200 252 L195 240 L190 228 L185 218 L180 208 L175 198 L168 190 L158 186 L150 182 Z" fill="currentColor" className="text-white/80"/>
-                  <ellipse cx="125" cy="135" rx="50" ry="55" fill="currentColor" className="text-white/80"/>
-                </svg>
-              </div>
-            </>
+            <div className="pointer-events-none absolute -right-10 bottom-0 hidden w-[220px] opacity-25 sm:block lg:right-6">
+              <svg viewBox="0 0 280 500" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-full">
+                <path d="M140 180 C120 180 100 190 90 210 C80 230 75 250 80 270 L70 320 C65 340 60 350 55 370 L50 410 C48 420 45 430 50 440 L55 455 L60 470 L65 480 L75 490 L90 500 L100 490 L95 475 L90 460 L85 440 L90 420 L100 380 L105 360 L110 340 L115 320 L118 300 C118 300 120 310 130 320 C140 330 150 335 155 340 L160 350 L158 370 L155 390 L150 420 L145 440 L140 460 L135 480 L140 500 L155 500 L160 480 L162 460 L165 440 L170 420 L175 390 L180 360 L185 340 L195 320 L210 300 L220 290 L225 280 L220 270 L210 265 L200 260 L195 250 L190 240 L185 230 L180 220 L175 210 L170 200 L165 190 L155 185 L150 180 Z" fill="currentColor" className="text-white/60"/>
+                <circle cx="140" cy="140" r="55" fill="currentColor" className="text-white/60"/>
+              </svg>
+            </div>
           )}
 
-          <div className="relative z-10 mx-auto max-w-4xl px-4 py-10 text-center sm:py-14">
-            <div className="animate-fade-in">
-              {/* Logo oficial */}
-              <div className="mx-auto mb-4 flex justify-center animate-float">
-                <Logo size="xl" priority />
+          <div className="relative z-10 w-full px-4 pb-8 sm:px-6 sm:pb-10 lg:px-8">
+            <div className="animate-fade-in-up mx-auto max-w-6xl">
+              <div className="mb-3 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center">
+                  <Logo size="sm" priority />
+                </div>
+                <div className="h-px flex-1 max-w-40 bg-gradient-to-r from-yellow-400/40 to-transparent" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-400">
+                  La cultura es tu mejor arma
+                </span>
               </div>
 
-              {heroBanner?.title && (
-                <h1
-                  className="font-archivo text-4xl font-normal leading-none tracking-wide min-[380px]:text-5xl sm:text-6xl md:text-7xl lg:text-8xl"
-                  style={{ color: heroBanner?.text_color || '#ffffff' }}
-                >
-                  {heroBanner.title.split(' ').map((word, i) =>
-                    i === heroBanner.title.split(' ').length - 1 && heroBanner.title.split(' ').length > 1 ? (
-                      <span key={i} style={{ color: heroBanner?.accent_color || '#facc15' }}>{word}</span>
-                    ) : (
-                      <span key={i}>{word}{i < heroBanner.title.split(' ').length - 1 ? ' ' : ''}</span>
-                    )
+              {heroBanner?.title ? (
+                <>
+                  <h1
+                    className="font-archivo text-4xl leading-none tracking-wide min-[380px]:text-5xl sm:text-6xl"
+                    style={{ color: heroBanner.text_color || '#ffffff' }}
+                  >
+                    {heroBanner.title.split(' ').map((word, i) =>
+                      i === heroBanner.title.split(' ').length - 1 && heroBanner.title.split(' ').length > 1 ? (
+                        <span key={i} style={{ color: heroBanner.accent_color || '#facc15' }}>{word}</span>
+                      ) : (
+                        <span key={i}>{word}{i < heroBanner.title.split(' ').length - 1 ? ' ' : ''}</span>
+                      )
+                    )}
+                  </h1>
+                  {heroBanner.subtitle && (
+                    <p
+                      className="mt-2 text-xs font-bold tracking-[0.25em] sm:text-sm"
+                      style={{ color: heroBanner.accent_color || '#facc15' }}
+                    >
+                      {heroBanner.subtitle}
+                    </p>
                   )}
+                </>
+              ) : (
+                <h1 className="font-archivo text-4xl leading-none tracking-wide min-[380px]:text-5xl sm:text-6xl">
+                  JUEGA <span className="text-yellow-400">HIP HOP</span>
                 </h1>
               )}
 
-              {heroBanner?.subtitle && (
-                <p
-                  className="mt-4 text-sm font-semibold tracking-[0.25em] sm:text-base"
-                  style={{ color: heroBanner.accent_color || '#facc15' }}
-                >
-                  {heroBanner.subtitle}
-                </p>
-              )}
-
-              {heroBanner?.description && (
-                <p className="mt-2 text-xs tracking-wider text-zinc-500 sm:text-sm">
-                  {heroBanner.description}
-                </p>
-              )}
-
-              {/* CTA Button */}
               {heroBanner?.link_url && (
                 <a
                   href={heroBanner.link_url}
-                  className="mt-8 inline-flex min-h-12 items-center justify-center rounded-xl bg-yellow-400 px-8 py-3 text-sm font-bold text-black transition-all hover:bg-yellow-300 active:scale-[0.97]"
+                  className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl px-6 py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 active:scale-[0.97]"
                   style={{ backgroundColor: heroBanner.accent_color || '#facc15' }}
                 >
                   {heroBanner.link_label || 'JUGAR AHORA'}
                 </a>
               )}
-
-              {/* Scroll indicator */}
-              <div className="mt-10 animate-float">
-                <svg className="mx-auto h-6 w-6 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                </svg>
-              </div>
             </div>
           </div>
         </section>
 
-        {/* ─── GAMES SECTION ─── */}
-        <section id="juegos" className="py-10 sm:py-16 lg:py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-yellow-400/30 border-t-yellow-400" />
-                <p className="text-[10px] uppercase tracking-wider text-zinc-600">Cargando juegos…</p>
-              </div>
-            ) : loadError ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="mb-4 text-3xl">📡</div>
-                <p className="max-w-sm text-center text-xs uppercase tracking-wider text-zinc-500">
-                  {loadError}
-                </p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="mt-4 rounded-xl bg-yellow-400 px-6 py-2.5 text-sm font-bold text-black transition-colors hover:bg-yellow-300"
-                >
-                  REINTENTAR
-                </button>
-              </div>
-            ) : (
-              <>
-                {availableGames.length > 0 && (
-                  <>
-                    <div className="mb-8 text-center sm:mb-10">
-                      <h2 className="font-archivo text-2xl tracking-wide text-white sm:text-3xl lg:text-4xl">
-                        JUEGOS <span className="text-yellow-400">DISPONIBLES</span>
-                      </h2>
-                      <div className="mx-auto mt-3 h-0.5 w-16 rounded-full bg-yellow-500/50" />
-                      {!user && (
-                        <p className="mt-3 text-[10px] uppercase tracking-wider text-zinc-600">
-                          Juega sin registro — tu progreso se guarda al crear una cuenta
-                        </p>
-                      )}
+        {/* ─── CONTENIDO PRINCIPAL ─── */}
+        <main id="juegos" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-yellow-400/30 border-t-yellow-400" />
+              <p className="text-[10px] uppercase tracking-wider text-zinc-600">Cargando juegos…</p>
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="mb-4 text-3xl">📡</div>
+              <p className="max-w-sm text-center text-xs uppercase tracking-wider text-zinc-500">
+                {loadError}
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 rounded-xl bg-yellow-400 px-6 py-2.5 text-sm font-bold text-black transition-colors hover:bg-yellow-300"
+              >
+                REINTENTAR
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* ─── Stats rápidas del jugador ─── */}
+              {user && profile && (
+                <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    { label: 'NIVEL', value: profile.level ?? 1, icon: '⭐', color: 'text-yellow-400' },
+                    { label: 'XP TOTAL', value: (profile.xp ?? 0).toLocaleString(), icon: '⚡', color: 'text-purple-400' },
+                    { label: 'RACHA', value: profile.current_streak ?? 0, icon: '🔥', color: 'text-orange-400' },
+                    { label: 'COMPLETADOS', value: profile.total_games_completed ?? 0, icon: '🏆', color: 'text-emerald-400' },
+                  ].map((stat) => (
+                    <div
+                      key={stat.label}
+                      className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
+                    >
+                      <span className="text-xl">{stat.icon}</span>
+                      <div className="min-w-0">
+                        <div className={`text-lg font-black leading-tight ${stat.color}`}>{stat.value}</div>
+                        <div className="truncate text-[9px] font-semibold uppercase tracking-widest text-zinc-500">
+                          {stat.label}
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-                      {availableGames.map((game, i) => (
-                        <div key={game.slug} style={{ animationDelay: `${(i + 1) * 100}ms` }}>
+                  ))}
+                </div>
+              )}
+
+              {/* ─── DESTACADOS: cards horizontales grandes ─── */}
+              {featuredGames.length > 0 && (
+                <section className="mb-10">
+                  <div className="mb-4 flex items-center gap-3">
+                    <h2 className="font-archivo text-xl tracking-wide text-white sm:text-2xl">
+                      DESTACADOS <span className="text-yellow-400">🔥</span>
+                    </h2>
+                    <div className="h-px flex-1 bg-gradient-to-r from-yellow-400/30 to-transparent" />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {featuredGames.map((game, i) => (
+                      <FeaturedCard key={game.slug} game={game} progress={progressMap[game.slug] ?? null} index={i} />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* ─── TODOS LOS JUEGOS ─── */}
+              {gridGames.length > 0 && (
+                <section>
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="font-archivo text-xl tracking-wide text-white sm:text-2xl">
+                      TODOS LOS <span className="text-yellow-400">JUEGOS</span>
+                    </h2>
+
+                    {/* Filtros por categoría */}
+                    {categories.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setActiveCategory('todos')}
+                          className={`rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                            activeCategory === 'todos'
+                              ? 'border-yellow-400/50 bg-yellow-400/15 text-yellow-400'
+                              : 'border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:text-white'
+                          }`}
+                          type="button"
+                        >
+                          Todos
+                        </button>
+                        {categories.map((cat) => (
+                          <button
+                            key={cat}
+                            onClick={() => setActiveCategory(cat)}
+                            className={`rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                              activeCategory === cat
+                                ? 'border-yellow-400/50 bg-yellow-400/15 text-yellow-400'
+                                : 'border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:text-white'
+                            }`}
+                            type="button"
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {!user && (
+                    <p className="mb-4 text-[10px] uppercase tracking-wider text-zinc-600">
+                      Juega sin registro — tu progreso se guarda al crear una cuenta
+                    </p>
+                  )}
+
+                  {visibleGrid.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-white/[0.06] p-10 text-center">
+                      <div className="mb-2 text-3xl">🎮</div>
+                      <p className="text-xs uppercase tracking-wider text-zinc-500">
+                        No hay juegos en esta categoría todavía
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {visibleGrid.map((game, i) => (
+                        <div key={game.slug} className="animate-fade-in-up" style={{ animationDelay: `${(i % 8) * 60}ms` }}>
                           <GameCard game={game} progress={progressMap[game.slug] ?? null} />
                         </div>
                       ))}
                     </div>
-                  </>
-                )}
+                  )}
+                </section>
+              )}
 
-                {comingSoonGames.length > 0 && (
-                  <div className={availableGames.length > 0 ? 'mt-16 sm:mt-20' : ''}>
-                    <div className="mb-8 text-center sm:mb-10">
-                      <h2 className="font-archivo text-2xl tracking-wide text-white sm:text-3xl lg:text-4xl">
-                        PRÓXIMOS <span className="text-yellow-400">LANZAMIENTOS</span>
-                      </h2>
-                      <div className="mx-auto mt-3 h-0.5 w-16 rounded-full bg-yellow-500/50" />
-                      <p className="mt-3 text-[10px] uppercase tracking-wider text-zinc-600">
-                        Prepárate para lo que se viene 🔥
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-                      {comingSoonGames.map((game, i) => (
-                        <div key={game.slug} style={{ animationDelay: `${(i + 1) * 100}ms` }}>
-                          <GameCard game={game} progress={null} />
-                        </div>
-                      ))}
-                    </div>
+              {/* ─── PRÓXIMOS LANZAMIENTOS ─── */}
+              {comingSoonGames.length > 0 && (
+                <section className="mt-12">
+                  <div className="mb-4 flex items-center gap-3">
+                    <h2 className="font-archivo text-xl tracking-wide text-white sm:text-2xl">
+                      PRÓXIMOS <span className="text-yellow-400">LANZAMIENTOS</span>
+                    </h2>
+                    <div className="h-px flex-1 bg-gradient-to-r from-yellow-400/30 to-transparent" />
                   </div>
-                )}
+                  <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {comingSoonGames.map((game) => (
+                      <GameCard key={game.slug} game={game} progress={null} />
+                    ))}
+                  </div>
+                </section>
+              )}
 
-                {availableGames.length === 0 && comingSoonGames.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-white/[0.06] p-10 text-center">
-                    <div className="mb-2 text-3xl">🎮</div>
-                    <p className="text-xs uppercase tracking-wider text-zinc-500">
-                      No hay juegos disponibles en este momento
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </section>
+              {availableGames.length === 0 && comingSoonGames.length === 0 && (
+                <div className="rounded-xl border border-dashed border-white/[0.06] p-10 text-center">
+                  <div className="mb-2 text-3xl">🎮</div>
+                  <p className="text-xs uppercase tracking-wider text-zinc-500">
+                    No hay juegos disponibles en este momento
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </main>
 
         {/* ─── FOOTER ─── */}
-        <footer className="mt-auto border-t border-white/[0.06] py-10 sm:py-14">
+        <footer className="border-t border-white/[0.06] py-8">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="grid gap-8 sm:grid-cols-3">
-              <div className="text-center sm:text-left">
-                <div className="mb-3 flex justify-center sm:justify-start">
-                  <Logo size="sm" />
-                </div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  El hip hop no es moda,<br />
-                  <span className="text-zinc-300">es cultura.</span>
+            <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+              <div className="flex items-center gap-2">
+                <Logo size="sm" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                  El hip hop no es moda, <span className="text-zinc-300">es cultura.</span>
                 </p>
               </div>
-              <div className="text-center sm:text-left">
-                <div className="mb-3 flex justify-center sm:justify-start">
-                  <svg className="h-6 w-6 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="2" y="8" width="20" height="12" rx="2" ry="2"/>
-                    <circle cx="8" cy="14" r="3" fill="#0a0a0a" stroke="currentColor" strokeWidth="1.5"/>
-                    <circle cx="16" cy="14" r="3" fill="#0a0a0a" stroke="currentColor" strokeWidth="1.5"/>
-                    <rect x="5" y="3" width="14" height="5" rx="1"/>
-                    <circle cx="8" cy="14" r="1.5" fill="currentColor"/>
-                    <circle cx="16" cy="14" r="1.5" fill="currentColor"/>
-                  </svg>
-                </div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
-                  RAP, DJ, BREAK,<br />
-                  GRAFFITI, KNOWLEDGE.
-                </p>
-              </div>
-              <div className="text-center sm:text-left">
-                <div className="mb-3 flex justify-center sm:justify-start">
-                  <svg className="h-6 w-6 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <circle cx="12" cy="12" r="10"/>
-                    <ellipse cx="12" cy="12" rx="4" ry="10"/>
-                    <path d="M2 12h20"/>
-                  </svg>
-                </div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
-                  CONECTA. COMPITE.<br />
-                  REPRESENTA.
-                </p>
+              <div className="flex items-center gap-4">
+                <span className="text-[10px] uppercase tracking-wider text-zinc-700">
+                  RAP · DJ · BREAK · GRAFFITI · KNOWLEDGE
+                </span>
+                <Link
+                  href="/privacidad"
+                  className="text-[10px] uppercase tracking-wider text-zinc-600 transition-colors hover:text-yellow-400"
+                >
+                  Política de Privacidad
+                </Link>
               </div>
             </div>
-            <div className="mt-10 flex flex-col items-center gap-3 pt-6 text-center text-[10px] uppercase tracking-wider text-zinc-700 sm:flex-row sm:justify-between">
-              <span>© 2025 Juega Hip Hop — La cultura es tu mejor arma</span>
-              <Link
-                href="/privacidad"
-                className="text-zinc-600 transition-colors hover:text-yellow-400"
-              >
-                Política de Privacidad
-              </Link>
+            <div className="mt-6 border-t border-white/[0.04] pt-4 text-center text-[9px] uppercase tracking-wider text-zinc-800">
+              © 2026 Juega Hip Hop — La cultura es tu mejor arma
+              {debug && <span className="ml-2">[{debug}]</span>}
             </div>
-            {debug && (
-              <div className="hidden mt-2 text-center text-[8px] text-zinc-800">
-                [{debug}]
-              </div>
-            )}
           </div>
         </footer>
       </div>
     </div>
+  )
+}
+
+// ─── Card destacada horizontal: portada landscape + info ───
+
+function FeaturedCard({
+  game,
+  progress,
+  index,
+}: {
+  game: GameCatalogEntry
+  progress: GameProgress | null
+  index: number
+}) {
+  const accentColor = game.accent_color ?? game.color ?? '#7C3AED'
+  const baseColor = game.color ?? '#7C3AED'
+  const progressPct = progress && progress.total > 0
+    ? Math.min((progress.current / progress.total) * 100, 100)
+    : 0
+
+  return (
+    <a
+      href={`/jugar/${game.slug}`}
+      aria-label={`Jugar ${game.name}`}
+      className="group relative block overflow-hidden rounded-2xl border border-white/[0.06] transition-all duration-300 hover:-translate-y-1"
+      style={{ animationDelay: `${index * 100}ms` }}
+    >
+      <div className="relative aspect-[16/8] w-full overflow-hidden sm:aspect-[16/7]">
+        {game.image_url ? (
+          <img
+            src={`${game.image_url}?v=${new Date(game.updated_at).getTime()}`}
+            alt={game.name}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div
+            className="flex h-full w-full items-center justify-center"
+            style={{
+              background: `radial-gradient(circle at 25% 25%, ${baseColor}40 0%, transparent 55%), linear-gradient(150deg, ${baseColor}2e 0%, #0a0a0a 75%)`,
+            }}
+          >
+            <span className="text-6xl transition-transform duration-500 group-hover:scale-110">{game.emoji}</span>
+          </div>
+        )}
+
+        {/* Gradientes */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/70 via-transparent to-transparent" />
+
+        {/* Badge */}
+        <div
+          className="absolute left-3 top-3 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-black"
+          style={{ backgroundColor: accentColor }}
+        >
+          DESTACADO
+        </div>
+
+        {/* Info sobre la portada */}
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5 sm:p-6">
+          <div className="min-w-0">
+            <h3 className="font-archivo text-2xl leading-tight tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] sm:text-3xl" style={{ color: accentColor }}>
+              {game.name}
+            </h3>
+            <p className="mt-1.5 line-clamp-2 max-w-md text-[10px] uppercase leading-relaxed tracking-wider text-zinc-200 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
+              {game.short_description}
+            </p>
+
+            {progress && progress.total > 0 && (
+              <div className="mt-2 max-w-xs">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[9px] uppercase tracking-wider text-zinc-400">{progress.label}</span>
+                  <span className="text-[10px] font-bold" style={{ color: accentColor }}>
+                    {progress.current}/{progress.total}
+                  </span>
+                </div>
+                <div className="h-1 overflow-hidden rounded-full bg-white/[0.08]">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{ backgroundColor: accentColor, width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Botón JUGAR */}
+          <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-110"
+            style={{
+              backgroundColor: `${accentColor}ee`,
+              boxShadow: `0 0 0 6px ${accentColor}22`,
+            }}
+          >
+            <svg className="ml-0.5 h-5 w-5 text-black" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </a>
   )
 }

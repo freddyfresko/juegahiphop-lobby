@@ -54,6 +54,7 @@ export default function GameContainer({
   const sessionIdRef = useRef<string | null>(null)
   const sessionStartedRef = useRef<number>(0)
   const endedRef = useRef(false)
+  const lastScoreSentRef = useRef(0)
 
   const [state, setState] = useState<ContainerState>('loading')
   const [errorMsg, setErrorMsg] = useState<string>('')
@@ -104,6 +105,12 @@ export default function GameContainer({
       }
       sessionIdRef.current = data.id
       sessionStartedRef.current = Date.now()
+
+      // Incrementar contador de partidas del usuario en este juego
+      void supabase
+        .rpc('increment_game_plays', { p_user_id: userId, p_game_id: slug })
+        .then(() => {}, () => { /* no crítico */ })
+
       return data.id
     } catch {
       return null
@@ -132,6 +139,25 @@ export default function GameContainer({
       })
       .eq('id', sessionId)
   }, [supabase])
+
+  /** Registrar evento de telemetría (solo con sesión activa) */
+  const recordEvent = useCallback(async (
+    eventType: string,
+    eventData: Record<string, unknown> = {},
+  ) => {
+    if (!userId) return
+    try {
+      await supabase.rpc('record_game_event', {
+        p_user_id: userId,
+        p_game_id: slug,
+        p_session_id: sessionIdRef.current,
+        p_event_type: eventType,
+        p_event_data: eventData,
+      })
+    } catch (err) {
+      console.warn('[GameContainer] Error registrando evento:', err)
+    }
+  }, [userId, slug, supabase])
 
   /** Manejar solicitud de guardado del juego → persistir en Supabase */
   const handleSaveProgress = useCallback(async (
@@ -235,6 +261,13 @@ export default function GameContainer({
         alreadyUnlocked,
         error: error && !alreadyUnlocked ? error.message : undefined,
       })
+
+      // Telemetría del logro (aunque ya estuviera desbloqueado)
+      await recordEvent('achievement_unlocked', {
+        achievementId: payload.achievementId,
+        alreadyUnlocked,
+        ...(payload.metadata ?? {}),
+      })
     } catch (err) {
       gameClientRef.current?.sendAchievementResult({
         requestId,
@@ -242,7 +275,7 @@ export default function GameContainer({
         error: err instanceof Error ? err.message : 'Error desconocido',
       })
     }
-  }, [userId, supabase])
+  }, [userId, supabase, recordEvent])
 
   /** Volver al lobby */
   const handleBackToLobby = useCallback(() => {
@@ -376,27 +409,119 @@ export default function GameContainer({
 
     // 3. Eventos del juego
 
-    gameClient.onGameCompleted(async (payload) => {
-      if (!userId) return // Invitado: no registrar progreso
-      try {
-        await supabase.from('game_completions').insert({
-          user_id: userId,
-          game_id: slug,
-          item_id: payload.itemId ?? 'unknown',
-          difficulty: payload.difficulty ?? 'normal',
-          score: payload.score,
-          metadata: payload.metadata ?? {},
-          completed_at: new Date().toISOString(),
-        })
+    // ── Inicio de partida: guardar contexto (nivel/dificultad) + telemetría ──
+    gameClient.onGameStarted(async (payload) => {
+      if (!userId) return
+      if (sessionIdRef.current) {
+        await supabase
+          .from('game_sessions')
+          .update({
+            level_id: payload.levelId ?? null,
+            difficulty: payload.difficulty ?? null,
+          })
+          .eq('id', sessionIdRef.current)
+      }
+      await recordEvent('game_started', {
+        levelId: payload.levelId ?? null,
+        difficulty: payload.difficulty ?? null,
+      })
+    })
 
-        await supabase.rpc('increment_game_completions', { p_user_id: userId })
+    // ── Partida completada: historial + cierre de sesión con stats + telemetría ──
+    gameClient.onGameCompleted(async (payload) => {
+      if (!userId) return
+      const sessionId = sessionIdRef.current
+
+      // ═══ Normalización del payload — RANKING-PROTOCOL v1.0.0 ═══
+      // Regla 2: score es un entero ≥ 0. Cualquier cosa rara → 0.
+      const rawScore = typeof payload.score === 'number' ? payload.score : Number(payload.score)
+      const score = Number.isFinite(rawScore) && rawScore > 0 ? Math.round(rawScore) : 0
+      // Regla 3: completed SOLO es true explícito. Si el juego no lo manda,
+      // la partida NO cuenta como completada (default conservador).
+      const completed = payload.completed === true
+
+      const itemsCompleted =
+        typeof payload.metadata?.itemsCompleted === 'number'
+          ? (payload.metadata.itemsCompleted as number)
+          : payload.itemId
+            ? 1
+            : 0
+      const timeSpent = payload.timeSpent ?? (sessionStartedRef.current
+        ? Math.round((Date.now() - sessionStartedRef.current) / 1000)
+        : null)
+
+      // 1. Historial de completados (idempotente — no duplica si el item ya estaba)
+      try {
+        await supabase
+          .from('game_completions')
+          .upsert(
+            {
+              user_id: userId,
+              game_id: slug,
+              item_id: payload.itemId ?? 'unknown',
+              difficulty: payload.difficulty ?? 'normal',
+              score,
+              metadata: payload.metadata ?? {},
+              completed_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id,game_id,item_id,difficulty', ignoreDuplicates: true },
+          )
       } catch (err) {
         console.warn('[GameContainer] Error registrando completado:', err)
       }
+
+      // 2. Cerrar la sesión con resultado → actualiza game_state
+      //    (best_score, playtime, completions) y player_profiles
+      if (sessionId) {
+        try {
+          await supabase.rpc('finish_game_session', {
+            p_session_id: sessionId,
+            p_score: score,
+            p_items_completed: itemsCompleted,
+            p_result: completed ? 'completed' : 'abandoned',
+            p_playtime_seconds: timeSpent,
+            p_metadata: {
+              ...(payload.metadata ?? {}),
+              itemId: payload.itemId,
+              difficulty: payload.difficulty,
+            },
+          })
+        } catch (err) {
+          console.warn('[GameContainer] Error cerrando sesión:', err)
+        }
+      }
+
+      // 3. Telemetría
+      await recordEvent('game_completed', {
+        score,
+        itemId: payload.itemId ?? null,
+        difficulty: payload.difficulty ?? null,
+        timeSpent,
+        completed: payload.completed !== false,
+      })
     })
 
-    gameClient.onScoreUpdated(() => {
-      // Future: overlay de puntaje en vivo
+    // ── Score en vivo: actualizar la sesión con throttle (cada 5s) ──
+    gameClient.onScoreUpdated((payload) => {
+      const now = Date.now()
+      if (now - lastScoreSentRef.current < 5000) return
+      lastScoreSentRef.current = now
+      const sessionId = sessionIdRef.current
+      if (!sessionId || !userId) return
+      const playtime = sessionStartedRef.current
+        ? Math.round((now - sessionStartedRef.current) / 1000)
+        : null
+      void supabase
+        .rpc('update_session_score', {
+          p_session_id: sessionId,
+          p_score: payload.score,
+          p_playtime_seconds: playtime,
+        })
+        .then(() => {}, () => { /* no crítico */ })
+      recordEvent('score_updated', {
+        score: payload.score,
+        progress: payload.progress ?? null,
+      }).catch(() => { /* no crítico */ })
     })
 
     // ── Persistencia: el juego le pide al lobby que guarde ──
@@ -445,6 +570,11 @@ export default function GameContainer({
 
     gameClient.onError((payload) => {
       setErrorMsg(payload.message)
+      recordEvent('game_error', {
+        code: payload.code,
+        message: payload.message,
+        fatal: payload.fatal,
+      }).catch(() => { /* no crítico */ })
       if (payload.fatal) {
         setState('error')
         endSession('error')
