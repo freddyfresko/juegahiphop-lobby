@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Header from '@/components/Header'
 import GameCard from '@/components/GameCard'
 import Logo from '@/components/Logo'
+import Link from 'next/link'
 import type { PlayerProfile, GameCatalogEntry, GameProgress, Banner } from '@/lib/types'
 import type { User } from '@supabase/supabase-js'
 
@@ -375,8 +376,14 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                 </p>
               </div>
             </div>
-            <div className="mt-10 pt-6 text-center text-[10px] uppercase tracking-wider text-zinc-700">
-              © 2025 Juega Hip Hop — La cultura es tu mejor arma
+            <div className="mt-10 flex flex-col items-center gap-3 pt-6 text-center text-[10px] uppercase tracking-wider text-zinc-700 sm:flex-row sm:justify-between">
+              <span>© 2025 Juega Hip Hop — La cultura es tu mejor arma</span>
+              <Link
+                href="/privacidad"
+                className="text-zinc-600 transition-colors hover:text-yellow-400"
+              >
+                Política de Privacidad
+              </Link>
             </div>
             {debug && (
               <div className="hidden mt-2 text-center text-[8px] text-zinc-800">
