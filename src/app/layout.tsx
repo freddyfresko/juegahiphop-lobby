@@ -29,7 +29,8 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    shortcut: ['/icons/favicon-32x32.png'],
+    icon: [{ url: '/icons/juegahiphop_512.png', sizes: '512x512', type: 'image/png' }],
+    shortcut: ['/icons/juegahiphop_512.png'],
     other: [
       { url: '/icons/ios-167x167.png', sizes: '167x167', type: 'image/png' },
       { url: '/icons/ios-152x152.png', sizes: '152x152', type: 'image/png' },
