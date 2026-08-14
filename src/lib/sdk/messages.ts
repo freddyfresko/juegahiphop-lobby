@@ -136,6 +136,9 @@ export function connectGameCallbacks(
       case 'jh:end_session':
         handlers.onEndSession?.(msg.payload as never)
         break
+      case 'jh:viewport_changed':
+        handlers.onViewportChanged?.(msg.payload as never)
+        break
     }
   }, allowedOrigins)
 

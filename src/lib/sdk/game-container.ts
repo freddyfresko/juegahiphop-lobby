@@ -31,6 +31,7 @@ import type {
   AchievementResultPayload,
   CampaignResponsePayload,
   EndSessionPayload,
+  ViewportPayload,
   MessageCallback,
 } from './types'
 
@@ -80,6 +81,8 @@ export interface GameClientInstance {
   sendPause: () => void
   /** Reanudar el juego */
   sendResume: () => void
+  /** Notificar el viewport real del iframe al juego */
+  sendViewportChanged: (payload: ViewportPayload) => void
 
   /** Destruir la instancia */
   destroy: () => void
@@ -243,6 +246,7 @@ export function createGameClient(
     sendEndSession: (payload) => sendToGame(MessageType.END_SESSION, payload ?? { reason: 'navigate_away' }),
     sendPause: () => sendToGame(MessageType.PAUSE, undefined),
     sendResume: () => sendToGame(MessageType.RESUME, undefined),
+    sendViewportChanged: (payload) => sendToGame(MessageType.VIEWPORT_CHANGED, payload),
 
     get gameProtocolVersion() { return _gameProtocolVersion },
 

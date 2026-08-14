@@ -339,7 +339,10 @@ export default function GameContainer({
         // 2d. Enviar contexto al juego
         gameClient.sendSessionContext(sessionContext)
 
-        // 2e. ¡Juego activo!
+        // 2e. Notificar viewport inicial al juego (tamaño real del iframe)
+        sendViewport()
+
+        // 2f. ¡Juego activo!
         setState('playing')
       } catch (err) {
         if (destroyed) return
@@ -347,6 +350,27 @@ export default function GameContainer({
         setState('timeout')
       }
     }
+
+    // Envía el tamaño real del iframe al juego (dvh del contenedor).
+    const sendViewport = () => {
+      const rect = iframe.getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) return
+      gameClient.sendViewportChanged({
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        isFullscreen: document.fullscreenElement !== null,
+        orientation:
+          window.innerHeight > window.innerWidth ? 'portrait' : 'landscape',
+        devicePixelRatio: window.devicePixelRatio || 1,
+      })
+    }
+
+    // Observar cambios de tamaño del iframe (resize de ventana, fullscreen,
+    // teclado móvil, rotación) y notificar al juego para que re-layoutee.
+    const resizeObserver = new ResizeObserver(() => {
+      if (gameClientRef.current) sendViewport()
+    })
+    resizeObserver.observe(iframe)
 
     init()
 
@@ -445,6 +469,7 @@ export default function GameContainer({
     // 5. Cleanup
     return () => {
       destroyed = true
+      resizeObserver.disconnect()
       window.removeEventListener('beforeunload', handleBeforeUnload)
       gameClient.destroy()
       if (!endedRef.current) {
