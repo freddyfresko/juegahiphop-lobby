@@ -1,5 +1,12 @@
+import type { Metadata } from 'next'
 import AuthForm from '@/components/AuthForm'
 import Logo from '@/components/Logo'
+import { noIndexMetadata } from '@/lib/seo'
+
+export const metadata: Metadata = {
+  ...noIndexMetadata,
+  title: 'Iniciar sesión',
+}
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string; error_description?: string; reason?: string; view?: string }>

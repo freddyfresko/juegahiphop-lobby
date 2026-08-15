@@ -1,8 +1,15 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import AdminDashboard from './AdminDashboard'
+import { noIndexMetadata } from '@/lib/seo'
 import type { GameCatalogEntry, Banner, CampaignEntry } from '@/lib/types'
+
+export const metadata: Metadata = {
+  ...noIndexMetadata,
+  title: 'Admin',
+}
 
 export default async function AdminPage() {
   const supabase = await createClient()

@@ -1,6 +1,16 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import RankingPageClient from './RankingPageClient'
 import type { GameCatalogEntry } from '@/lib/types'
+
+export const metadata: Metadata = {
+  title: 'Ranking',
+  description:
+    'Ranking de Juega Hip Hop: los mejores jugadores, puntajes y XP de la comunidad. ¿Estás en el top?',
+  alternates: {
+    canonical: '/ranking',
+  },
+}
 
 export default async function RankingPage() {
   const supabase = await createClient()

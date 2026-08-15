@@ -2,6 +2,7 @@ import LobbyClient from './LobbyClient'
 import { createClient } from '@/lib/supabase/server'
 import type { GameCatalogEntry, Banner } from '@/lib/types'
 import { PUBLIC_GAME_CATALOG } from '@/lib/public-game-catalog'
+import { SITE_URL } from '@/lib/seo'
 
 /**
  * Home page — COMPLETAMENTE PÚBLICA.
@@ -30,10 +31,33 @@ export default async function HomePage() {
     .eq('active', true)
     .order('sort_order', { ascending: true })
 
+  // Structured data: ItemList de juegos (schema.org)
+  const gamesJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Juegos de Juega Hip Hop',
+    itemListElement: publicGames.map((game, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'VideoGame',
+        name: game.name,
+        description: game.description ?? game.short_description,
+        url: `${SITE_URL}/jugar/${game.slug}`,
+      },
+    })),
+  }
+
   return (
-    <LobbyClient
-      initialGames={publicGames.length > 0 ? publicGames : PUBLIC_GAME_CATALOG}
-      initialBanners={(banners ?? []) as Banner[]}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(gamesJsonLd) }}
+      />
+      <LobbyClient
+        initialGames={publicGames.length > 0 ? publicGames : PUBLIC_GAME_CATALOG}
+        initialBanners={(banners ?? []) as Banner[]}
+      />
+    </>
   )
 }

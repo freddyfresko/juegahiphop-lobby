@@ -1,8 +1,11 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Política de Privacidad — Juega Hip Hop',
+  title: 'Política de Privacidad',
   description: 'Política de privacidad de Juega Hip Hop: qué datos recopilamos, cómo los usamos y tus derechos.',
+  alternates: {
+    canonical: '/privacidad',
+  },
 }
 
 /**

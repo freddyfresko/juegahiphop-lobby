@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Bangers, Inter } from 'next/font/google'
 import './globals.css'
+import { baseMetadata, webSiteJsonLd, SITE_NAME, SITE_URL } from '@/lib/seo'
 
 const bangers = Bangers({
   weight: '400',
@@ -16,13 +17,11 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Juega Hip Hop — Lobby',
-  description: 'Plataforma de juegos con temática de hip hop. Sopa de letras, rompecabezas y más.',
+  ...baseMetadata,
   manifest: '/manifest.webmanifest',
-  applicationName: 'Juega Hip Hop',
   appleWebApp: {
     capable: true,
-    title: 'Juega Hip Hop',
+    title: SITE_NAME,
     statusBarStyle: 'black-translucent',
   },
   formatDetection: {
@@ -43,26 +42,6 @@ export const metadata: Metadata = {
       { url: '/icons/android-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
   },
-  openGraph: {
-    title: 'Juega Hip Hop',
-    description: 'La cultura es tu mejor arma. Juega, aprende, representa.',
-    siteName: 'Juega Hip Hop',
-    type: 'website',
-    images: [
-      {
-        url: '/icons/pwa-512x512.png',
-        width: 512,
-        height: 512,
-        alt: 'Juega Hip Hop',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Juega Hip Hop',
-    description: 'La cultura es tu mejor arma. Juega, aprende, representa.',
-    images: ['/icons/pwa-512x512.png'],
-  },
 }
 
 export const viewport: Viewport = {
@@ -78,6 +57,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const jsonLd = webSiteJsonLd()
   return (
     <html
       lang="es"
@@ -85,6 +65,11 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
     >
       <body className="min-h-dvh overflow-x-hidden bg-[#0a0a0a] font-inter text-white antialiased">
+        {/* Structured data: WebSite (schema.org) — el head lo genera la metadata API */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         {/* Reglas críticas del rail lateral inline (inmunes a caché de CSS): el contenido
             siempre corre al lado de la barra fija, en cualquier viewport. */}
         <style>{`

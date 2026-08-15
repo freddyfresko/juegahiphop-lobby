@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -5,10 +6,59 @@ import { validateGameUrl } from '@/lib/game-utils'
 import { getDevGameOverride } from '@/lib/dev-override'
 import { getPublicGameBySlug } from '@/lib/public-game-catalog'
 import GameContainer from '@/components/GameContainer'
+import { videoGameJsonLd, SITE_NAME } from '@/lib/seo'
 import type { GameCatalogEntry } from '@/lib/types'
 
 interface PageProps {
   params: Promise<{ slug: string }>
+}
+
+/** Metadata dinámica por juego: title/description/keywords + canonical */
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params
+  let game: GameCatalogEntry | null = null
+
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.from('games').select('*').eq('slug', slug).single()
+    game = (data as GameCatalogEntry | null) ?? null
+  } catch {
+    // DB caída → catálogo de respaldo
+  }
+
+  game = game ?? getPublicGameBySlug(slug)
+
+  if (!game || game.status === 'hidden') {
+    return { robots: { index: false, follow: false } }
+  }
+
+  const title = `${game.name} — Juega gratis online`
+  const description = game.description ?? game.short_description
+
+  return {
+    title,
+    description,
+    keywords: [
+      game.name,
+      `juego ${game.name}`,
+      `jugar ${game.name}`,
+      'juegos hip hop',
+      'juegos de cultura hip hop',
+      'juegos gratis online',
+    ],
+    alternates: {
+      canonical: `/jugar/${slug}`,
+    },
+    openGraph: {
+      title: `${game.name} — ${SITE_NAME}`,
+      description,
+      type: 'website',
+      url: `/jugar/${slug}`,
+      images: game.image_url
+        ? [{ url: game.image_url, alt: game.name }]
+        : undefined,
+    },
+  }
 }
 
 export default async function JugarSlugPage({ params }: PageProps) {
@@ -67,12 +117,19 @@ export default async function JugarSlugPage({ params }: PageProps) {
   }
 
   return (
-    <GameContainer
-      slug={slug}
-      game={{ ...typedGame, allowed_origins: allowedOrigins }}
-      validatedUrl={urlCheck.url}
-      userId={user?.id ?? null}
-    />
+    <>
+      {/* Structured data: VideoGame (schema.org) */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(videoGameJsonLd(typedGame)) }}
+      />
+      <GameContainer
+        slug={slug}
+        game={{ ...typedGame, allowed_origins: allowedOrigins }}
+        validatedUrl={urlCheck.url}
+        userId={user?.id ?? null}
+      />
+    </>
   )
 }
 
