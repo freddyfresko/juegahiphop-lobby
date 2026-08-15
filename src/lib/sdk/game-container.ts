@@ -25,6 +25,8 @@ import type {
   LoadProgressPayload,
   UnlockAchievementPayload,
   CampaignRequestPayload,
+  ResetProgressPayload,
+  ResetResultPayload,
   SessionContextPayload,
   SaveResultPayload,
   ProgressDataPayload,
@@ -61,6 +63,8 @@ export interface GameClientInstance {
   onUnlockAchievement: (cb: MessageCallback<UnlockAchievementPayload>) => void
   /** El juego solicita campaña recompensada */
   onCampaignRequest: (cb: MessageCallback<CampaignRequestPayload>) => void
+  /** El juego solicita RESETEAR su progreso */
+  onResetProgress: (cb: MessageCallback<ResetProgressPayload>) => void
 
   // ═══ Respuestas: Lobby → Game ═══
   /** Responder a save_progress */
@@ -71,6 +75,8 @@ export interface GameClientInstance {
   sendAchievementResult: (payload: AchievementResultPayload) => void
   /** Responder a campaign_request */
   sendCampaignResponse: (payload: CampaignResponsePayload) => void
+  /** Responder a reset_progress */
+  sendResetResult: (payload: ResetResultPayload) => void
 
   // ═══ Contexto: Lobby → Game ═══
   /** Enviar contexto de sesión al juego (después de game_ready) */
@@ -180,6 +186,9 @@ export function createGameClient(
       case MessageType.CAMPAIGN_REQUEST:
         campaignRequestCb.forEach((cb) => cb({ ...(data.payload as CampaignRequestPayload), _requestId: requestId } as CampaignRequestPayload & { _requestId?: string }))
         break
+      case MessageType.RESET_PROGRESS:
+        resetProgressCb.forEach((cb) => cb({ ...(data.payload as ResetProgressPayload), _requestId: requestId } as ResetProgressPayload & { _requestId?: string }))
+        break
     }
   }
 
@@ -220,6 +229,7 @@ export function createGameClient(
   let loadProgressCb: MessageCallback<LoadProgressPayload>[] = []
   let unlockAchievementCb: MessageCallback<UnlockAchievementPayload>[] = []
   let campaignRequestCb: MessageCallback<CampaignRequestPayload>[] = []
+  let resetProgressCb: MessageCallback<ResetProgressPayload>[] = []
 
   const instance: GameClientInstance = {
     // ═══ Listeners ═══
@@ -234,12 +244,14 @@ export function createGameClient(
     onLoadProgress: (cb) => { loadProgressCb.push(cb) },
     onUnlockAchievement: (cb) => { unlockAchievementCb.push(cb) },
     onCampaignRequest: (cb) => { campaignRequestCb.push(cb) },
+    onResetProgress: (cb) => { resetProgressCb.push(cb) },
 
     // ═══ Respuestas ═══
     sendSaveResult: (payload) => sendToGame(MessageType.SAVE_RESULT, payload, payload.requestId),
     sendProgressData: (payload) => sendToGame(MessageType.PROGRESS_DATA, payload, payload.requestId),
     sendAchievementResult: (payload) => sendToGame(MessageType.ACHIEVEMENT_RESULT, payload, payload.requestId),
     sendCampaignResponse: (payload) => sendToGame(MessageType.CAMPAIGN_RESPONSE, payload, payload.requestId),
+    sendResetResult: (payload) => sendToGame(MessageType.RESET_RESULT, payload, payload.requestId),
 
     // ═══ Contexto ═══
     sendSessionContext: (payload) => sendToGame(MessageType.SESSION_CONTEXT, payload),
@@ -267,6 +279,7 @@ export function createGameClient(
       loadProgressCb = []
       unlockAchievementCb = []
       campaignRequestCb = []
+      resetProgressCb = []
     },
   }
 

@@ -10,6 +10,7 @@ import type {
   LoadProgressPayload,
   UnlockAchievementPayload,
   CampaignRequestPayload,
+  ResetProgressPayload,
   SaveResultPayload,
   ProgressDataPayload,
   AchievementResultPayload,
@@ -191,6 +192,15 @@ export default function GameContainer({
           game_id: slug,
           state: payload.gameState,
           best_score: payload.score ?? 0,
+          // Progreso REAL del juego para las cards del lobby (ej: 3/9 categorías).
+          // Si el juego no lo manda, conservar los valores previos (undefined → no toca).
+          ...(payload.progress
+            ? {
+                progress_current: Math.max(0, Math.round(payload.progress.current)),
+                progress_total: Math.max(0, Math.round(payload.progress.total)),
+                progress_label: payload.progress.label,
+              }
+            : {}),
           last_played_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -290,6 +300,35 @@ export default function GameContainer({
       })
     }
   }, [userId, supabase, recordEvent])
+
+  /** Manejar RESET de progreso → el juego pide empezar de 0.
+   *  El lobby borra todo el progreso del usuario para este juego
+   *  (RPC server-side, 1 transacción) y responde al juego. */
+  const handleResetProgress = useCallback(async (
+    payload: ResetProgressPayload & { _requestId?: string },
+  ): Promise<void> => {
+    const requestId = payload._requestId ?? ''
+    if (!userId) {
+      gameClientRef.current?.sendResetResult({ requestId, success: false, error: 'Debes iniciar sesión' })
+      return
+    }
+    if (payload.confirm !== true) {
+      gameClientRef.current?.sendResetResult({ requestId, success: false, error: 'confirm no fue true' })
+      return
+    }
+    try {
+      const { error } = await supabase.rpc('reset_game_progress', { p_game_id: slug })
+      if (error) throw error
+      gameClientRef.current?.sendResetResult({ requestId, success: true })
+    } catch (err) {
+      console.warn('[GameContainer] Error reseteando progreso:', err)
+      gameClientRef.current?.sendResetResult({
+        requestId,
+        success: false,
+        error: err instanceof Error ? err.message : 'Error desconocido',
+      })
+    }
+  }, [userId, slug, supabase])
 
   /** Volver al lobby */
   const handleBackToLobby = useCallback(() => {
@@ -546,6 +585,9 @@ export default function GameContainer({
 
     // ── Logros: el juego le pide al lobby que registre ──
     gameClient.onUnlockAchievement((payload) => handleUnlockAchievement(payload))
+
+    // ── Reset: el juego le pide al lobby que borre su progreso ──
+    gameClient.onResetProgress((payload) => handleResetProgress(payload))
 
     gameClient.onCampaignRequest(async (payload: CampaignRequestPayload) => {
       const requestId = (payload as unknown as { _requestId?: string })._requestId ?? ''

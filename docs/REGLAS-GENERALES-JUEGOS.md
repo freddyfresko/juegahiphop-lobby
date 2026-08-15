@@ -141,10 +141,11 @@ lobby.sendGameCompleted({
 
 | Método | Mensaje | Respuesta |
 |--------|---------|-----------|
-| `await saveProgress({ gameState, score?, metadata? })` | `jh:save_progress` | `{ success, error? }` |
+| `await saveProgress({ gameState, score?, progress?, metadata? })` | `jh:save_progress` | `{ success, error? }` |
 | `await loadProgress({ schemaVersion? })` | `jh:load_progress` | `{ success, gameState, bestScore?, error? }` |
 | `await unlockAchievement({ achievementId, metadata? })` | `jh:unlock_achievement` | `{ success, alreadyUnlocked?, error? }` |
 | `await requestCampaign({ placement, rewardIds, metadata? })` | `jh:campaign_request` | `{ status, campaignId?, rewardedIds?, message? }` |
+| `await resetProgress({ confirm: true })` | `jh:reset_progress` | `{ success, error? }` |
 
 ### 5.3 Lobby → Juego (listeners)
 
@@ -191,6 +192,14 @@ const res = await lobby.saveProgress({
   },
   score: 1200,      // opcional → actualiza best_score
   metadata: { ... },
+  // ⭐ PROGRESO REAL del juego (opcional pero RECOMENDADO):
+  // el lobby lo muestra en las cards del home/perfil como barra
+  // de avance. current = avance actual, total = meta, label = unidad.
+  progress: {
+    current: 3,
+    total: 9,
+    label: 'Categorías',
+  },
 })
 if (res.success) { /* todo ok */ }
 
@@ -204,9 +213,52 @@ if (data.success && data.gameState) {
 > ⚠️ `save_progress` es para el ESTADO del juego — **NO** para el ranking.
 > El ranking solo mira `game_completed`.
 
+> ⭐ **`progress` en `save_progress`** (nuevo, protocolo v2): el campo
+> `progress: { current, total, label }` es el **avance REAL del juego**
+> que el lobby muestra en las cards del home y perfil (barra de progreso).
+> Sin él, el lobby cae al fallback (partidas jugadas) — que no refleja
+> el progreso real. Mándalo SIEMPRE en cada save:
+> - Sopa: `{ current: wordsFound.length, total: <total palabras>, label: 'Palabras' }`
+> - Puzzle: `{ current: puzzlesCompletados, total: <total puzzles>, label: 'Puzzles' }`
+> - Juego con etapas: `{ current: etapaActual, total: etapasTotales, label: 'Etapas' }`
+
 ---
 
-## 8. Logros
+## 8. Reset de progreso (el jugador empieza de 0)
+
+El botón "Reiniciar progreso" vive **DENTRO del juego** (pantalla de
+settings/perfil del juego). El juego le pide al lobby que borre TODO el
+progreso de ese usuario en Supabase y el lobby responde:
+
+```ts
+// 1. El jugador confirma en el juego (2 pasos: botón → "¿Seguro?")
+const res = await lobby.resetProgress({ confirm: true })
+// res: { success, error? }
+
+if (res.success) {
+  // 2. Resetear el estado LOCAL del juego (localStorage, React state…)
+  //    y volver a la pantalla inicial / tutorial.
+}
+```
+
+**Qué borra el lobby** (RPC `reset_game_progress`, una sola transacción):
+- `game_state` (estado guardado + best_score + progress_*)
+- `user_game_progress` (progreso versionado)
+- `game_sessions` (historial de partidas → **baja el XP/ranking** de ese juego)
+- `game_completions` (items completados)
+- `achievement_unlocks` SOLO de ese juego (los globales no se tocan)
+- `game_events` (telemetría)
+- Recalcula XP/nivel/racha globales del jugador
+
+Reglas:
+- **`confirm: true` es OBLIGATORIO** — sin él el lobby rechaza (evita resets accidentales).
+- El lobby valida que el usuario esté logueado (invitado → error).
+- Después del reset, el juego queda como recién instalado: la próxima
+  `loadProgress()` devuelve `gameState: null`.
+
+---
+
+## 9. Logros
 
 ```ts
 const res = await lobby.unlockAchievement({
@@ -221,7 +273,7 @@ const res = await lobby.unlockAchievement({
 
 ---
 
-## 9. Campañas / publicidad (opcional)
+## 10. Campañas / publicidad (opcional)
 
 El lobby maneja la publicidad (AdinPlay, NitroPay, Google Ads, sponsors).
 Tu juego solo pide una campaña en un "placement" (momento):
@@ -243,7 +295,7 @@ Placements usados actualmente: `game_level_complete`, `game_results`.
 
 ---
 
-## 10. Contexto de sesión (qué sabes del jugador)
+## 11. Contexto de sesión (qué sabes del jugador)
 
 Después del handshake recibes `jh:session_context`:
 
@@ -267,7 +319,7 @@ interface SessionContextPayload {
 
 ---
 
-## 11. Viewport / responsive
+## 12. Viewport / responsive
 
 El lobby te notifica el **tamaño real del iframe** (`jh:viewport_changed`)
 cuando: cambia la ventana, entra/sale fullscreen, rota el celular, o aparece
@@ -281,7 +333,7 @@ lobby.onViewportChanged((vp) => {
 
 ---
 
-## 12. Fullscreen, salir y errores
+## 13. Fullscreen, salir y errores
 
 ```ts
 // Botón de pantalla completa (el lobby la gestiona)
@@ -299,7 +351,7 @@ como `abandoned` automáticamente (sendBeacon). No necesitas hacer nada.
 
 ---
 
-## 13. Registrar tu juego en el catálogo
+## 14. Registrar tu juego en el catálogo
 
 El lobby lee la tabla `games` (Supabase) para mostrar las tarjetas y montar
 el iframe. Ejemplo de INSERT (o edítalo en el panel admin `/admin`):
@@ -335,7 +387,7 @@ INSERT INTO games (
 
 ---
 
-## 14. Checklist de desarrollo (nuevo juego o actualización)
+## 15. Checklist de desarrollo (nuevo juego o actualización)
 
 **Integración SDK:**
 - [ ] `createLobbyClient` con `lobbyOrigin` correcto (prod: `https://juegahiphop.cl`)
@@ -353,8 +405,10 @@ INSERT INTO games (
 **Persistencia y extras:**
 - [ ] `loadProgress()` al inicio → restaurar estado
 - [ ] `saveProgress()` en momentos clave (nivel completado, salir)
+- [ ] `saveProgress()` con `progress: { current, total, label }` → el lobby muestra el avance real en las cards (palabras, categorías, niveles…)
 - [ ] `unlockAchievement()` en logros
 - [ ] `requestCampaign()` en los placements (si quieres ads)
+- [ ] `resetProgress({ confirm: true })` en el botón "Reiniciar progreso" del juego (si lo tienes)
 - [ ] Funciona como invitado (`isGuest`) con localStorage
 
 **Despliegue:**
@@ -364,7 +418,7 @@ INSERT INTO games (
 
 ---
 
-## 15. Errores comunes
+## 16. Errores comunes
 
 | ❌ Error | ✅ Correcto |
 |---------|------------|
@@ -378,7 +432,7 @@ INSERT INTO games (
 
 ---
 
-## 16. Referencias (archivos clave en el repo)
+## 17. Referencias (archivos clave en el repo)
 
 | Archivo | Para qué |
 |---------|----------|

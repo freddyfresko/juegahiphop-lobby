@@ -18,8 +18,9 @@ const STATUS_LABELS: Record<string, { label: string; icon: string }> = {
 }
 
 /**
- * Tarjeta tipo póster: la portada es la protagonista.
- * Hover → zoom + glow del color del juego + botón JUGAR.
+ * Tarjeta CUADRADA: la portada es la protagonista (aspect-square,
+ * sin texto encima). Título + descripción viven en el pie, fuera
+ * del cuadrado. Hover → zoom + glow del color del juego + botón JUGAR.
  */
 export default function GameCard({ game, progress }: GameCardProps) {
   const cardRef = useRef<HTMLElement | null>(null)
@@ -74,8 +75,8 @@ export default function GameCard({ game, progress }: GameCardProps) {
           zIndex: 1,
         }}
       >
-        {/* ═══ Portada (aspecto póster) ═══ */}
-        <div className="relative aspect-[4/5] w-full overflow-hidden">
+        {/* ═══ Portada (CUADRADA — la imagen es la protagonista, sin texto encima) ═══ */}
+        <div className="relative aspect-square w-full overflow-hidden">
           {hasCover ? (
             <img
               src={`${game.image_url}?v=${new Date(game.updated_at).getTime()}`}
@@ -100,9 +101,8 @@ export default function GameCard({ game, progress }: GameCardProps) {
             </div>
           )}
 
-          {/* Gradiente base para legibilidad */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/20 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/50 via-transparent to-transparent" />
+          {/* Gradiente sutil inferior para legibilidad del badge (sin tapar la imagen) */}
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0a0a0a]/50 to-transparent" />
 
           {/* Overlay hover con botón JUGAR */}
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
@@ -128,20 +128,22 @@ export default function GameCard({ game, progress }: GameCardProps) {
               </span>
             </div>
           )}
+        </div>
 
-          {/* ═══ Info del juego sobre la portada ═══ */}
-          <div className="absolute inset-x-0 bottom-0 p-4 pt-14">
+        {/* ═══ Pie: título + descripción FUERA del cuadrado ═══ */}
+        <div className="bg-[#0d0d0d] p-4">
+          <div className="flex items-start justify-between gap-2">
             <h3
-              className="font-archivo text-xl leading-tight tracking-wide drop-shadow-lg"
+              className="font-archivo text-lg leading-tight tracking-wide"
               style={{ color: accentColor }}
             >
               {game.name}
             </h3>
 
-            {/* Categoría + estado */}
-            <div className="mt-1 flex items-center gap-2">
+            {/* Categoría / beta */}
+            <div className="flex shrink-0 items-center gap-1.5">
               {game.category && game.category !== 'games' && (
-                <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-300 backdrop-blur-sm">
+                <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-300">
                   {game.category}
                 </span>
               )}
@@ -153,18 +155,10 @@ export default function GameCard({ game, progress }: GameCardProps) {
                   Beta
                 </span>
               )}
-              {isPlayable && (
-                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400">
-                  ▶ JUGAR
-                </span>
-              )}
             </div>
           </div>
-        </div>
 
-        {/* ═══ Pie: descripción + progreso ═══ */}
-        <div className="bg-[#0d0d0d] p-4">
-          <p className="line-clamp-2 text-[11px] uppercase leading-relaxed tracking-wide text-zinc-500">
+          <p className="mt-1 line-clamp-2 text-[11px] uppercase leading-relaxed tracking-wide text-zinc-500">
             {game.short_description}
           </p>
 

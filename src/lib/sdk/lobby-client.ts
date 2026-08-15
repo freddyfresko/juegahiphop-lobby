@@ -47,6 +47,8 @@ import type {
   LoadProgressPayload,
   UnlockAchievementPayload,
   CampaignRequestPayload,
+  ResetProgressPayload,
+  ResetResultPayload,
   SessionContextPayload,
   ProgressDataPayload,
   SaveResultPayload,
@@ -91,6 +93,8 @@ export interface LobbyClientInstance {
   unlockAchievement: (payload: UnlockAchievementPayload) => Promise<AchievementResultPayload>
   /** Solicitar campaña recompensada (vía lobby) */
   requestCampaign: (payload: CampaignRequestPayload) => Promise<CampaignResponsePayload>
+  /** RESETEAR el progreso del juego (vía lobby — borra todo en Supabase) */
+  resetProgress: (payload?: ResetProgressPayload) => Promise<ResetResultPayload>
 
   // ═══ Listeners (eventos del lobby) ═══
   /** Escuchar contexto de sesión (perfil, userId, etc.) */
@@ -138,6 +142,7 @@ export function createLobbyClient(options: LobbyClientOptions): LobbyClientInsta
   const pendingLoads = new Map<string, PendingRequest<ProgressDataPayload>>()
   const pendingAchievements = new Map<string, PendingRequest<AchievementResultPayload>>()
   const pendingCampaigns = new Map<string, PendingRequest<CampaignResponsePayload>>()
+  const pendingResets = new Map<string, PendingRequest<ResetResultPayload>>()
 
   // ─── Callback arrays (eventos push) ───
   let pauseCb: MessageCallback[] = []
@@ -205,6 +210,17 @@ export function createLobbyClient(options: LobbyClientOptions): LobbyClientInsta
         if (pending) {
           clearTimeout(pending.timer)
           pendingCampaigns.delete(resp.requestId)
+          pending.resolve(resp)
+        }
+        break
+      }
+
+      case MessageType.RESET_RESULT: {
+        const resp = msg.payload as ResetResultPayload
+        const pending = pendingResets.get(resp.requestId)
+        if (pending) {
+          clearTimeout(pending.timer)
+          pendingResets.delete(resp.requestId)
           pending.resolve(resp)
         }
         break
@@ -292,6 +308,10 @@ export function createLobbyClient(options: LobbyClientOptions): LobbyClientInsta
       return createPending(pendingCampaigns, MessageType.CAMPAIGN_REQUEST, payload, 30000)
     },
 
+    resetProgress: (payload?: ResetProgressPayload): Promise<ResetResultPayload> => {
+      return createPending(pendingResets, MessageType.RESET_PROGRESS, payload ?? {})
+    },
+
     // ═══ Listeners ═══
     onSessionContext: (cb: MessageCallback<SessionContextPayload>) => { sessionContextCb.push(cb) },
     onPause: (cb: MessageCallback) => { pauseCb.push(cb) },
@@ -323,6 +343,11 @@ export function createLobbyClient(options: LobbyClientOptions): LobbyClientInsta
         pending.reject(new Error('Cliente destruido'))
       }
       pendingCampaigns.clear()
+      for (const [, pending] of pendingResets) {
+        clearTimeout(pending.timer)
+        pending.reject(new Error('Cliente destruido'))
+      }
+      pendingResets.clear()
       pauseCb = []
       resumeCb = []
       sessionContextCb = []

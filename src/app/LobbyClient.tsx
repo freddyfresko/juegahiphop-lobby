@@ -14,9 +14,25 @@ import type { User } from '@supabase/supabase-js'
  */
 function computeProgress(
   game: GameCatalogEntry,
-  _state: Record<string, unknown> | null,
-  totalPlays: number,
+  row: {
+    total_plays: number
+    completions_count: number | null
+    progress_current: number | null
+    progress_total: number | null
+    progress_label: string | null
+  } | null,
 ): GameProgress | null {
+  // Progreso REAL del juego (lo manda el juego en save_progress):
+  // ej: { current: 3, total: 9, label: 'Categorías' }
+  if (row?.progress_total && row.progress_total > 0) {
+    return {
+      current: Math.min(row.progress_current ?? 0, row.progress_total),
+      total: row.progress_total,
+      label: row.progress_label ?? game.progress_label ?? 'Progreso',
+    }
+  }
+  // Fallback legacy: total_items del catálogo + partidas jugadas
+  const totalPlays = row?.total_plays ?? 0
   const total = game.total_items
   if (!total || total <= 0) {
     if (totalPlays <= 0) return null
@@ -113,8 +129,8 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
           supabase
             .from('game_state')
             // ⚡ Solo agregados — NO traer `state` (JSONB pesado de la Sopa):
-            // computeProgress usa total_plays/completions_count, no el estado crudo.
-            .select('game_id, total_plays, best_score, total_playtime_seconds, completions_count')
+            // computeProgress usa total_plays/progress_*, no el estado crudo.
+            .select('game_id, total_plays, best_score, total_playtime_seconds, completions_count, progress_current, progress_total, progress_label')
             .eq('user_id', u.id),
           supabase
             .rpc('is_admin'),
@@ -131,8 +147,13 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
             )
             map[game.slug] = computeProgress(
               game,
-              null, // state crudo no se trae (JSONB pesado) — computeProgress no lo usa
-              row?.total_plays ?? 0,
+              (row as {
+                total_plays: number
+                completions_count: number | null
+                progress_current: number | null
+                progress_total: number | null
+                progress_label: string | null
+              }) ?? null,
             )
           }
           setProgressMap(map)

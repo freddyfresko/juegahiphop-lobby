@@ -65,6 +65,8 @@ export const MessageType = {
   UNLOCK_ACHIEVEMENT: 'jh:unlock_achievement',
   /** El juego solicita visualizar una campaña recompensada */
   CAMPAIGN_REQUEST: 'jh:campaign_request',
+  /** El juego solicita RESETEAR su progreso (empezar de 0) */
+  RESET_PROGRESS: 'jh:reset_progress',
 
   // ═══ Lobby → Game: Respuestas a solicitudes ═══
   /** Respuesta a save_progress (éxito/error) */
@@ -75,6 +77,8 @@ export const MessageType = {
   ACHIEVEMENT_RESULT: 'jh:achievement_result',
   /** Respuesta a campaign_request */
   CAMPAIGN_RESPONSE: 'jh:campaign_response',
+  /** Respuesta a reset_progress (éxito/error) */
+  RESET_RESULT: 'jh:reset_result',
 
   // ═══ Lobby → Game: Contexto y control ═══
   /** Contexto de sesión: perfil, progreso, configuración */
@@ -154,12 +158,32 @@ export interface SaveProgressPayload {
   score?: number
   /** Metadatos adicionales (estadísticas, configuración, etc.) */
   metadata?: Record<string, unknown>
+  /**
+   * Progreso REAL del juego para mostrar en el lobby (cards, perfil):
+   * ej: { current: 3, total: 9, label: 'Categorías' } o
+   *     { current: 120, total: 930, label: 'Palabras' }.
+   * Si viene, el lobby lo guarda en game_state.progress_* y las cards
+   * muestran el avance real (no partidas jugadas).
+   */
+  progress?: {
+    current: number
+    total: number
+    label: string
+  }
 }
 
 /** El juego solicita cargar su estado guardado */
 export interface LoadProgressPayload {
   /** Versión del esquema que el juego espera (para migración) */
   schemaVersion?: string
+}
+
+/** El juego solicita RESETEAR su progreso (empezar de 0) */
+export interface ResetProgressPayload {
+  /** Confirmación explícita — evita resets accidentales */
+  confirm?: boolean
+  /** Metadatos adicionales */
+  metadata?: Record<string, unknown>
 }
 
 /** El juego solicita registrar un logro desbloqueado */
@@ -243,6 +267,16 @@ export type CampaignRewardStatus =
   | 'expired'
   | 'error'
 
+/** Respuesta del lobby a reset_progress */
+export interface ResetResultPayload {
+  /** Mismo requestId de la solicitud */
+  requestId: string
+  /** true si el progreso fue borrado */
+  success: boolean
+  /** Mensaje de error si success=false */
+  error?: string
+}
+
 // ─── Contexto: Lobby → Game ═══
 
 /** Contexto de sesión enviado al juego después del handshake */
@@ -302,10 +336,12 @@ export interface MessagePayloadMap {
   [MessageType.LOAD_PROGRESS]: LoadProgressPayload
   [MessageType.UNLOCK_ACHIEVEMENT]: UnlockAchievementPayload
   [MessageType.CAMPAIGN_REQUEST]: CampaignRequestPayload
+  [MessageType.RESET_PROGRESS]: ResetProgressPayload
   [MessageType.SAVE_RESULT]: SaveResultPayload
   [MessageType.PROGRESS_DATA]: ProgressDataPayload
   [MessageType.ACHIEVEMENT_RESULT]: AchievementResultPayload
   [MessageType.CAMPAIGN_RESPONSE]: CampaignResponsePayload
+  [MessageType.RESET_RESULT]: ResetResultPayload
   [MessageType.SESSION_CONTEXT]: SessionContextPayload
   [MessageType.SAVE_CONFIRMED]: undefined
   [MessageType.PAUSE]: undefined
