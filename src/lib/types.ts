@@ -213,7 +213,7 @@ export interface CampaignEntry {
   image_url: string | null
   video_url: string | null
   destination_url: string
-  placement: CampaignPlacement
+  placements: CampaignPlacement[]
   priority: number
   allowed_games: string[]
   excluded_games: string[]

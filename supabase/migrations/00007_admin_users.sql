@@ -73,9 +73,8 @@ CREATE POLICY "Admins can delete games"
   ON games FOR DELETE
   USING (public.is_admin());
 
--- ============================================================
--- 4. Seed first admin user
--- ============================================================
+-- ─── 4. Seed admin users ───
+-- Ambos emails pertenecen a Freddy (dueño de la plataforma)
 INSERT INTO admin_users (email)
-VALUES ('freddyfresko@gmail.com')
+VALUES ('freddyfresko@gmail.com'), ('somoselhh@gmail.com')
 ON CONFLICT (email) DO NOTHING;

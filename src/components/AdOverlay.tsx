@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { SelectedCampaign } from '@/lib/campaign-manager'
 import type { CampaignPlacement } from '@/lib/types'
+import { loadAdinPlay, showAdinPlayAd, isAdinPlayConfigured } from '@/lib/adinplay-loader'
 
 // ─── Props ───
 
@@ -47,6 +48,35 @@ export default function AdOverlay({
   // Para rewarded: 5s antes de poder reclamar/cerrar (simula ad de video)
   const REWARDED_SECONDS = 5
   const trackRef = useRef(false)
+
+  // ─── Ad de red real (AdinPlay) ───
+  // Si la campaña es de AdinPlay y el SDK está configurado, intentamos
+  // mostrar el ad real de la red en el contenedor dedicado. Sin SDK
+  // configurado (o si falla), el overlay cae al contenido manual.
+  const isNetworkAd = campaign.provider === 'adinplay' && isAdinPlayConfigured()
+  const [networkAdMounted, setNetworkAdMounted] = useState(false)
+  const adContainerRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!isNetworkAd) return
+    let cancelled = false
+    loadAdinPlay().then(async (ok) => {
+      if (cancelled || !ok) return
+      // Mostrar el ad real (interstitial o rewarded según placement)
+      const kind: 'interstitial' | 'rewarded' = isRewarded ? 'rewarded' : 'interstitial'
+      const shown = await showAdinPlayAd(kind)
+      if (cancelled) return
+      if (shown) {
+        setNetworkAdMounted(true)
+        // El SDK de la red gestiona su propio cierre/recompensa.
+        // TODO(adinplay): conectar onClose/onReward del SDK real para
+        // llamar handleComplete('reward_granted' | 'dismissed') aquí.
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isNetworkAd, isRewarded])
 
   // Inicialización directa: interstitial permite cerrar de inmediato,
   // rewarded arranca con countdown y canClose=false
@@ -119,6 +149,17 @@ export default function AdOverlay({
       aria-label="Publicidad"
     >
       <div className="relative mx-4 w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0f0f0f] shadow-2xl">
+        {/* ─── Ad de red real (AdinPlay) — el SDK inyecta aquí ─── */}
+        {networkAdMounted ? (
+          <div
+            ref={adContainerRef}
+            className="flex min-h-[300px] w-full items-center justify-center"
+            aria-label="Publicidad"
+          >
+            {/* El SDK de AdinPlay monta su ad en este contenedor */}
+          </div>
+        ) : (
+          <>
         {/* ─── Ad badge ─── */}
         <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
           <span className="rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400 backdrop-blur-sm">
@@ -239,6 +280,8 @@ export default function AdOverlay({
             {!['google_ads','direct_sponsor','adinplay','nitropay','internal'].includes(campaign.provider) && campaign.provider}
           </p>
         </div>
+          </>
+        )}
       </div>
     </div>
   )

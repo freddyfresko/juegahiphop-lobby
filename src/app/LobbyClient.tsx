@@ -115,13 +115,12 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
             .select('game_id, state, total_plays, best_score, total_playtime_seconds, completions_count')
             .eq('user_id', u.id),
           supabase
-            .from('admin_users')
-            .select('id')
-            .eq('email', u.email)
-            .maybeSingle(),
+            .rpc('is_admin'),
         ]).then(([profileRes, gameStatesRes, adminRes]) => {
           setProfile(profileRes.data as PlayerProfile | null)
-          setIsAdmin(!!adminRes.data)
+          // is_admin() es SECURITY DEFINER y usa el email del JWT —
+          // bypasea el RLS de admin_users (la lectura directa no aplica)
+          setIsAdmin(!!(adminRes.data ?? false))
 
           const map: Record<string, GameProgress | null> = {}
           for (const game of games) {

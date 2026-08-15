@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import ImageUpload from './ImageUpload'
 import {
   createCampaign,
   updateCampaign,
@@ -94,7 +95,7 @@ function CampaignForm({
   const [description, setDescription] = useState(campaign?.description ?? '')
   const [imageUrl, setImageUrl] = useState(campaign?.image_url ?? '')
   const [destinationUrl, setDestinationUrl] = useState(campaign?.destination_url ?? '')
-  const [placement, setPlacement] = useState<CampaignPlacement>(campaign?.placement ?? 'game_results')
+  const [placements, setPlacements] = useState<CampaignPlacement[]>(campaign?.placements ?? ['game_results'])
   const [priority, setPriority] = useState(campaign?.priority ?? 50)
   const [allowedGames, setAllowedGames] = useState<string[]>(campaign?.allowed_games ?? [])
   const [excludedGames, setExcludedGames] = useState<string[]>(campaign?.excluded_games ?? [])
@@ -112,11 +113,16 @@ function CampaignForm({
   const [rewardDesc, setRewardDesc] = useState<string>(campaign?.reward?.description ?? '')
   const [saving, setSaving] = useState(false)
 
-  // Determinar si el placement es rewarded
-  const isRewarded =
-    placement === 'rewarded_hint' ||
-    placement === 'rewarded_continue' ||
-    placement === 'rewarded_bonus'
+  // Determinar si algún placement es rewarded (requiere configuración de recompensa)
+  const isRewarded = placements.some(
+    (p) => p === 'rewarded_hint' || p === 'rewarded_continue' || p === 'rewarded_bonus',
+  )
+
+  const togglePlacement = (value: CampaignPlacement) => {
+    setPlacements((prev) =>
+      prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value],
+    )
+  }
 
   const toggleGame = (slug: string, list: string[], setList: (v: string[]) => void) => {
     if (list.includes(slug)) {
@@ -137,7 +143,7 @@ function CampaignForm({
         description,
         image_url: imageUrl || null,
         destination_url: destinationUrl,
-        placement,
+        placements: placements.length > 0 ? placements : (['game_results'] as CampaignPlacement[]),
         priority: Number(priority) || 50,
         allowed_games: allowedGames,
         excluded_games: excludedGames,
@@ -233,26 +239,37 @@ function CampaignForm({
         </div>
       </div>
 
-      {/* ─── Placement ─── */}
+      {/* ─── Placements (multi) ─── */}
       <div>
         <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-          Placement (dónde aparece)
+          Placements (dónde aparece — puedes marcar varios)
         </label>
-        <select
-          value={placement}
-          onChange={(e) => setPlacement(e.target.value as CampaignPlacement)}
-          className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-yellow-500/40"
-        >
-          {['Lobby', 'Interstitial', 'Rewarded'].map((group) => (
-            <optgroup key={group} label={group} className="bg-zinc-900">
-              {PLACEMENT_OPTIONS.filter((p) => p.group === group).map((p) => (
-                <option key={p.value} value={p.value} className="bg-zinc-900">
-                  {p.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        {['Lobby', 'Interstitial', 'Rewarded'].map((group) => (
+          <div key={group} className="mb-2">
+            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-zinc-700">
+              {group}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {PLACEMENT_OPTIONS.filter((p) => p.group === group).map((p) => {
+                const active = placements.includes(p.value)
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => togglePlacement(p.value)}
+                    className={`rounded-lg border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all ${
+                      active
+                        ? 'border-yellow-500/40 bg-yellow-400/15 text-yellow-400'
+                        : 'border-white/[0.06] text-zinc-500 hover:text-white'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ─── Contenido del ad ─── */}
@@ -291,13 +308,22 @@ function CampaignForm({
       </div>
       <div>
         <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-          Imagen URL (16:9 ideal)
+          Imagen del anuncio (16:9 ideal)
         </label>
+        <ImageUpload
+          currentUrl={campaign?.image_url ?? null}
+          gameSlug="campaign"
+          bucket="campaign-images"
+          folder="campaigns"
+          label="Imagen (16:9 ideal)"
+          hint="JPG, PNG, WebP o AVIF · Máx 5MB · 16:9"
+          onUploadComplete={(url) => setImageUrl(url)}
+        />
         <input
           value={imageUrl}
           onChange={(e) => setImageUrl(e.target.value)}
-          placeholder="https://…"
-          className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-yellow-500/40"
+          placeholder="…o pega una URL externa (opcional)"
+          className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-yellow-500/40"
         />
       </div>
 
@@ -542,7 +568,7 @@ export default function CampaignManager({ campaigns, games }: CampaignManagerPro
                       </div>
                     )}
                     {/* Rewarded badge */}
-                    {c.placement.startsWith('rewarded_') && (
+                    {(c.placements ?? []).some((p) => p.startsWith('rewarded_')) && (
                       <span className="absolute left-1 top-1 rounded-full bg-yellow-400/90 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-black">
                         ⭐ Rewarded
                       </span>
@@ -562,7 +588,9 @@ export default function CampaignManager({ campaigns, games }: CampaignManagerPro
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-500">
                         <span className="rounded bg-white/[0.04] px-1.5 py-0.5">{c.provider}</span>
-                        <span className="rounded bg-white/[0.04] px-1.5 py-0.5">{c.placement}</span>
+                        {(c.placements ?? []).map((p) => (
+                          <span key={p} className="rounded bg-white/[0.04] px-1.5 py-0.5">{p}</span>
+                        ))}
                         <span className="rounded bg-white/[0.04] px-1.5 py-0.5">Pri {c.priority}</span>
                         {c.allowed_games.length > 0 && (
                           <span className="rounded bg-white/[0.04] px-1.5 py-0.5">

@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
+import { useIsAdmin } from '@/lib/use-is-admin'
 import Ranking from '@/components/Ranking'
 import type { GameCatalogEntry } from '@/lib/types'
 import type { User } from '@supabase/supabase-js'
 
 export default function RankingPageClient({ games }: { games: GameCatalogEntry[] }) {
   const [user, setUser] = useState<User | null>(null)
+  const isAdmin = useIsAdmin()
 
   useEffect(() => {
     const supabase = createClient()
@@ -17,7 +19,7 @@ export default function RankingPageClient({ games }: { games: GameCatalogEntry[]
 
   return (
     <div className="vignette brick-bg graffiti-spray min-h-dvh">
-      <Sidebar user={user} />
+      <Sidebar user={user} isAdmin={isAdmin} />
 
       <div className="relative z-10 flex min-h-dvh flex-col content-with-rail">
         <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">

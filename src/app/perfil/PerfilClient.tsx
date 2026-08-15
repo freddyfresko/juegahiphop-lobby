@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
+import { useIsAdmin } from '@/lib/use-is-admin'
 import type { PlayerProfile, AchievementUnlock, GameCatalogEntry } from '@/lib/types'
 import type { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
@@ -89,6 +90,7 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
   const [recentSessions, setRecentSessions] = useState<SessionRow[]>([])
   const [history, setHistory] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(true)
+  const isAdmin = useIsAdmin()
 
   useEffect(() => {
     const supabase = createClient()
@@ -191,7 +193,7 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
 
   return (
     <div className="vignette brick-bg graffiti-spray min-h-dvh">
-      <Sidebar user={user} profile={profile} />
+      <Sidebar user={user} profile={profile} isAdmin={isAdmin} />
 
       <div className="relative z-10 flex min-h-dvh flex-col content-with-rail">
         <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">

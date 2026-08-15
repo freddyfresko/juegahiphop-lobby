@@ -307,7 +307,7 @@ export interface CampaignInput {
   image_url?: string | null
   video_url?: string | null
   destination_url?: string
-  placement: CampaignPlacement
+  placements: CampaignPlacement[]
   priority?: number
   allowed_games?: string[]
   excluded_games?: string[]
@@ -335,7 +335,7 @@ export async function createCampaign(data: CampaignInput) {
     image_url: data.image_url ?? null,
     video_url: data.video_url ?? null,
     destination_url: data.destination_url ?? '',
-    placement: data.placement,
+    placements: data.placements,
     priority: data.priority ?? 50,
     allowed_games: data.allowed_games ?? [],
     excluded_games: data.excluded_games ?? [],

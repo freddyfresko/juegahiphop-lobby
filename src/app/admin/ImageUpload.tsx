@@ -7,9 +7,25 @@ interface ImageUploadProps {
   currentUrl: string | null
   gameSlug: string
   onUploadComplete: (url: string) => void
+  /** Bucket destino (default: game-covers) */
+  bucket?: string
+  /** Carpeta dentro del bucket (default: gameSlug) */
+  folder?: string
+  /** Label del campo (default: Portada) */
+  label?: string
+  /** Hint bajo el label (default: medidas de portada) */
+  hint?: string
 }
 
-export default function ImageUpload({ currentUrl, gameSlug, onUploadComplete }: ImageUploadProps) {
+export default function ImageUpload({
+  currentUrl,
+  gameSlug,
+  onUploadComplete,
+  bucket = 'game-covers',
+  folder,
+  label = 'Portada (1200×675px recomendado)',
+  hint = 'JPG, PNG, WebP o AVIF · Máx 5MB · 1200×675px',
+}: ImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(currentUrl)
   const [progress, setProgress] = useState(0)
@@ -39,13 +55,13 @@ export default function ImageUpload({ currentUrl, gameSlug, onUploadComplete }: 
       // Generar nombre único
       const ext = file.name.split('.').pop() || 'webp'
       const fileName = `${gameSlug}-${Date.now()}.${ext}`
-      const filePath = `${gameSlug}/${fileName}`
+      const filePath = `${folder ?? gameSlug}/${fileName}`
 
       setProgress(30)
 
       // Subir a Supabase Storage
       const { data, error } = await supabase.storage
-        .from('game-covers')
+        .from(bucket)
         .upload(filePath, file, {
           cacheControl: '31536000',
           upsert: true,
@@ -61,7 +77,7 @@ export default function ImageUpload({ currentUrl, gameSlug, onUploadComplete }: 
 
       // Obtener URL pública
       const { data: { publicUrl } } = supabase.storage
-        .from('game-covers')
+        .from(bucket)
         .getPublicUrl(filePath)
 
       setProgress(100)
@@ -74,7 +90,7 @@ export default function ImageUpload({ currentUrl, gameSlug, onUploadComplete }: 
       setUploading(false)
       setProgress(0)
     }
-  }, [gameSlug, onUploadComplete])
+  }, [gameSlug, folder, bucket, onUploadComplete])
 
   const handleFile = useCallback((file: File | undefined) => {
     if (!file) return
@@ -103,7 +119,7 @@ export default function ImageUpload({ currentUrl, gameSlug, onUploadComplete }: 
   return (
     <div className="space-y-2">
       <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-        Portada (1200×675px recomendado)
+        {label}
       </label>
 
       {/* Drop zone */}
@@ -168,7 +184,7 @@ export default function ImageUpload({ currentUrl, gameSlug, onUploadComplete }: 
                   Arrastra una imagen o haz click para subir
                 </p>
                 <p className="text-[10px] text-zinc-600">
-                  JPG, PNG, WebP o AVIF · Máx 5MB · 1200×675px
+                  {hint}
                 </p>
               </>
             )}

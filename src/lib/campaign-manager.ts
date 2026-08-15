@@ -22,7 +22,7 @@ export interface SelectedCampaign {
   image_url: string | null
   video_url: string | null
   destination_url: string
-  placement: CampaignPlacement
+  placements: CampaignPlacement[]
   priority: number
   reward: {
     type: string
