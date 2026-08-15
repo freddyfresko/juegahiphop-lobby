@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import { useIsAdmin } from '@/lib/use-is-admin'
-import type { PlayerProfile, AchievementUnlock, GameCatalogEntry } from '@/lib/types'
+import type { PlayerProfile, AchievementUnlock, AchievementDefinition, GameCatalogEntry } from '@/lib/types'
 import type { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 
@@ -42,6 +42,21 @@ const RESULT_LABELS: Record<string, { label: string; cls: string }> = {
   abandoned: { label: 'ABANDONADA', cls: 'text-zinc-400 border-zinc-400/20 bg-zinc-400/10' },
   error: { label: 'ERROR', cls: 'text-red-400 border-red-400/20 bg-red-400/10' },
   timeout: { label: 'TIMEOUT', cls: 'text-orange-400 border-orange-400/20 bg-orange-400/10' },
+}
+
+/** Badge de rareza de logros */
+const RARITY_STYLES: Record<string, string> = {
+  common: 'text-zinc-400 border-zinc-500/20 bg-zinc-500/10',
+  uncommon: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10',
+  rare: 'text-sky-400 border-sky-500/20 bg-sky-500/10',
+  epic: 'text-purple-400 border-purple-500/20 bg-purple-500/10',
+  legendary: 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10',
+}
+
+/** Logro desbloqueado + datos de su definición (JOIN en cliente) */
+interface AchievementWithDef extends AchievementUnlock {
+  rarity?: string
+  xp_reward?: number
 }
 
 function formatPlaytime(seconds: number | null): string {
@@ -118,6 +133,9 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
         .eq('user_id', userId)
         .order('unlocked_at', { ascending: false }),
       supabase
+        .from('achievements')
+        .select('achievement_id, name, description, icon, rarity, xp_reward, game_id, sort_order'),
+      supabase
         .from('game_state')
         .select('game_id, total_plays, best_score, total_playtime_seconds, completions_count, last_played_at')
         .eq('user_id', userId)
@@ -139,9 +157,31 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
         .eq('user_id', userId)
         .not('ended_at', 'is', null)
         .order('started_at', { ascending: false }),
-    ]).then(([profileRes, achievementsRes, statsRes, gamesRes, sessionsRes, historyRes]) => {
+    ]).then(([profileRes, achievementsRes, achDefsRes, statsRes, gamesRes, sessionsRes, historyRes]) => {
       setProfile(profileRes.data as PlayerProfile | null)
-      setAchievements(achievementsRes.data as AchievementUnlock[] ?? [])
+
+      // Mapear unlocks con sus definiciones (JOIN en cliente — achievement_unlocks
+      // solo guarda achievement_id; el nombre/descripción/icono viven en achievements)
+      const defs = (achDefsRes.data ?? []) as AchievementDefinition[]
+      const defByKey = new Map(defs.map((d) => [d.achievement_id, d]))
+      const unlocks = ((achievementsRes.data ?? []) as AchievementUnlock[]).map((u) => {
+        const def = defByKey.get(u.achievement_id)
+        // Fallback legible: 'sopa_ten_words' → 'Sopa Ten Words'
+        const prettyId = u.achievement_id
+          .split('_')
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ')
+        return {
+          ...u,
+          achievement_name: def?.name ?? prettyId,
+          achievement_description: def?.description ?? 'Logro desbloqueado',
+          icon: def?.icon ?? '🏆',
+          rarity: def?.rarity,
+          xp_reward: def?.xp_reward,
+        } as AchievementWithDef
+      })
+      setAchievements(unlocks)
+
       setGameStats(statsRes.data as GameStatRow[] ?? [])
       setGames(gamesRes.data as GameCatalogEntry[] ?? [])
       setRecentSessions(sessionsRes.data as SessionRow[] ?? [])
@@ -398,25 +438,48 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
                 </div>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {achievements.map((ach) => (
-                    <div
-                      key={ach.id}
-                      className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition-colors hover:border-yellow-500/20"
-                    >
-                      <span className="text-2xl">{ach.icon || '🏆'}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-white">
-                          {ach.achievement_name}
-                        </div>
-                        <div className="truncate text-xs text-zinc-500">
-                          {ach.achievement_description}
-                        </div>
-                        <div className="mt-0.5 text-[10px] uppercase tracking-wider text-zinc-700">
-                          {new Date(ach.unlocked_at).toLocaleDateString('es-CL')}
+                  {achievements.map((ach) => {
+                    const withDef = ach as AchievementWithDef
+                    return (
+                      <div
+                        key={ach.id}
+                        className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition-colors hover:border-yellow-500/20"
+                      >
+                        <span className="text-2xl leading-none">{ach.icon || '🏆'}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="truncate text-sm font-semibold text-white">
+                              {ach.achievement_name}
+                            </div>
+                            {withDef.rarity && (
+                              <span
+                                className={`shrink-0 rounded-full border px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
+                                  RARITY_STYLES[withDef.rarity] ?? RARITY_STYLES.common
+                                }`}
+                              >
+                                {withDef.rarity}
+                              </span>
+                            )}
+                          </div>
+                          <div className="truncate text-xs text-zinc-500">
+                            {ach.achievement_description}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-zinc-700">
+                            <span>
+                              {new Date(ach.unlocked_at).toLocaleDateString('es-CL', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </span>
+                            {withDef.xp_reward ? (
+                              <span className="text-yellow-500/70">· +{withDef.xp_reward} XP</span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </section>
