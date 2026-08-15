@@ -60,11 +60,18 @@ function levelFromXp(xp: number): number {
 }
 
 // Racha: días consecutivos con al menos una partida, contando desde
-// la última (hoy o ayer). Si la última fue hace más de 1 día → 0.
+// la última (hoy o ayer). Si la última fue hace >1 día → 0.
 function calcStreak(startedDates: Date[]): number {
   if (startedDates.length === 0) return 0
   const days = [...new Set(startedDates.map((d) => d.toDateString()))].sort((a, b) => b.localeCompare(a))
-  const dayDiff = (a: Date, b: Date) => Math.round((a.getTime() - b.getTime()) / 86400000)
+  // Diferencia en DÍAS DE CALENDARIO (medianoche a medianoche local).
+  // NO usar Math.round sobre horas: una partida de ayer 9am con "hoy 11pm"
+  // da ~1.6 días → round=2 → rompía la racha (la última parecía de hace 2 días).
+  const dayDiff = (a: Date, b: Date) => {
+    const da = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime()
+    const db = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime()
+    return Math.round((da - db) / 86400000)
+  }
 
   const today = new Date()
   const last = new Date(days[0])
