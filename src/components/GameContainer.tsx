@@ -117,7 +117,9 @@ export default function GameContainer({
     }
   }, [userId, slug, supabase, game.version, game.protocol_version])
 
-  /** Cerrar sesión de juego */
+  /** Cerrar sesión de juego — SIEMPRE vía RPC para que game_state,
+   *  player_profiles y recalc corran (UPDATE directo dejaba la sesión
+   *  abierta y las stats desincronizadas — bug números home/perfil/ranking) */
   const endSession = useCallback(async (
     result: 'completed' | 'abandoned' | 'error' | 'timeout' = 'abandoned',
   ) => {
@@ -130,14 +132,26 @@ export default function GameContainer({
       ? Math.round((Date.now() - sessionStartedRef.current) / 1000)
       : 0
 
-    await supabase
-      .from('game_sessions')
-      .update({
-        ended_at: new Date().toISOString(),
-        duration_seconds: durationSeconds,
-        session_result: result,
-      })
-      .eq('id', sessionId)
+    try {
+      if (result === 'completed') {
+        // Cierre con resultado: actualiza game_state + player_profiles + recalc
+        // p_score 0 → GREATEST conserva el score ya guardado por update_session_score
+        await supabase.rpc('finish_game_session', {
+          p_session_id: sessionId,
+          p_score: 0,
+          p_result: 'completed',
+          p_playtime_seconds: durationSeconds,
+        })
+      } else {
+        await supabase.rpc('close_session', {
+          p_session_id: sessionId,
+          p_result: result,
+          p_duration: durationSeconds,
+        })
+      }
+    } catch (err) {
+      console.warn('[GameContainer] Error cerrando sesión:', err)
+    }
   }, [supabase])
 
   /** Registrar evento de telemetría (solo con sesión activa) */

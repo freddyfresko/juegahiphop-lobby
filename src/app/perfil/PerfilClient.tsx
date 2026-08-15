@@ -130,12 +130,14 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
         .from('game_sessions')
         .select('id, game_id, started_at, duration_seconds, session_result, total_score, items_completed, difficulty')
         .eq('user_id', userId)
+        .not('ended_at', 'is', null)
         .order('started_at', { ascending: false })
         .limit(3),
       supabase
         .from('game_sessions')
         .select('started_at, total_score')
         .eq('user_id', userId)
+        .not('ended_at', 'is', null)
         .order('started_at', { ascending: false }),
     ]).then(([profileRes, achievementsRes, statsRes, gamesRes, sessionsRes, historyRes]) => {
       setProfile(profileRes.data as PlayerProfile | null)
@@ -161,7 +163,12 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
     ?? games.find((g) => g.slug === slug)?.color
     ?? '#7C3AED'
 
-  // ─── Stats conectadas a las tablas reales (game_sessions + game_state) ───
+  // ─── Stats unificadas — MISMA definición que ranking y home ───
+  // XP/nivel/racha = SOLO sesiones cerradas (ended_at IS NOT NULL).
+  // Completados = game_state.completions_count (agregado por juego).
+  // Sin fallbacks a player_profiles: tras la migración 00018 el
+  // persistido se recalcula con la misma definición, y mezclar
+  // fuentes era justo lo que producía los 3 números distintos.
 
   const totalPlaytime = gameStats.reduce((acc, s) => acc + (s.total_playtime_seconds ?? 0), 0)
 
@@ -172,11 +179,10 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
     return { xpTotal: xp, juegosCompletados: completions, streak: racha }
   }, [history, gameStats])
 
-  // Fallback al perfil persistido (por si algún día se calcula server-side)
-  const xpFinal = xpTotal > 0 ? xpTotal : (profile?.xp ?? 0)
-  const nivelFinal = Math.max(levelFromXp(xpFinal), profile?.level ?? 1)
-  const streakFinal = streak > 0 ? streak : (profile?.current_streak ?? 0)
-  const completadosFinal = juegosCompletados > 0 ? juegosCompletados : (profile?.total_games_completed ?? 0)
+  const xpFinal = xpTotal
+  const nivelFinal = levelFromXp(xpFinal)
+  const streakFinal = streak
+  const completadosFinal = juegosCompletados
 
   if (loading) {
     return (
