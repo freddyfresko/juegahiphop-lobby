@@ -4,6 +4,10 @@
  * Cliente que se usa DENTRO del juego (ejecutándose en un iframe)
  * para comunicarse con el Lobby que lo contiene.
  *
+ * El lobby es el CEREBRO: maneja usuario, sesión, y persistencia.
+ * Los juegos son stateless desde el punto de vista del backend.
+ * Toda lectura/escritura va por postMessage al lobby.
+ *
  * Uso:
  *   import { createLobbyClient } from '@juegahiphop/sdk'
  *
@@ -14,20 +18,26 @@
  *
  *   // Escuchar eventos del lobby
  *   lobby.onPause(() => { /* pausar juego *​/ })
- *   lobby.onResume(() => { /* reanudar *​/ })
  *   lobby.onSessionContext((ctx) => { /* recibir datos del usuario *​/ })
- *   lobby.onLoadProgress((data) => { /* cargar progreso guardado *​/ })
+ *   lobby.onProgressData((data) => { /* cargar progreso guardado *​/ })
  *
- *   // Enviar eventos
+ *   // Guardar/cargar progreso (vía el lobby)
+ *   const result = await lobby.saveProgress({ gameState: { ... }, score: 100 })
+ *   const data = await lobby.loadProgress()
+ *
+ *   // Registrar completion / logro
  *   lobby.sendGameCompleted({ score: 1000, itemId: 'nivel-3' })
+ *   lobby.sendAchievementUnlocked({ achievementId: 'first_win' })
+ *
+ *   // Salir
  *   lobby.sendExitGame({ reason: 'user_quit' })
- *   lobby.requestSave({ gameState: { ... } })
  */
 import { listenMessages } from './messages';
 import { MessageType } from './types';
 import { PROTOCOL_VERSION, createRequestId } from './types';
+const DEFAULT_TIMEOUT = 10000; // 10s para respuestas del lobby
 export function createLobbyClient(options) {
-    const { lobbyOrigin, capabilities } = options;
+    const { lobbyOrigin, capabilities, gameId } = options;
     let destroyed = false;
     // El origen del lobby es el que nos contiene (window.parent)
     const parentWindow = window.parent !== window ? window.parent : null;
@@ -41,17 +51,22 @@ export function createLobbyClient(options) {
             timestamp: Date.now(),
             protocolVersion: PROTOCOL_VERSION,
             source: 'game',
+            ...(gameId ? { gameId } : {}),
             ...(requestId ? { requestId } : {}),
         }, lobbyOrigin);
     };
-    // Escuchar mensajes del lobby
-    const listener = listenMessages((msg) => {
-        if (msg.source !== 'lobby')
-            return;
-    }, [lobbyOrigin]);
-    // Promesas pendientes de campaign_request
+    // ─── Promesas pendientes (request/response) ───
+    const pendingSaves = new Map();
+    const pendingLoads = new Map();
+    const pendingAchievements = new Map();
     const pendingCampaigns = new Map();
-    // Escuchar respuestas del lobby
+    const pendingResets = new Map();
+    // ─── Callback arrays (eventos push) ───
+    let pauseCb = [];
+    let resumeCb = [];
+    let sessionContextCb = [];
+    let endSessionCb = [];
+    // ─── Escuchar respuestas del lobby ───
     const responseListener = listenMessages((msg) => {
         if (msg.source !== 'lobby')
             return;
@@ -59,12 +74,45 @@ export function createLobbyClient(options) {
             case MessageType.SESSION_CONTEXT:
                 sessionContextCb.forEach((cb) => cb(msg.payload));
                 break;
-            case MessageType.LOAD_PROGRESS:
-                loadProgressCb.forEach((cb) => cb(msg.payload));
+            case MessageType.PAUSE:
+                pauseCb.forEach((cb) => cb(msg.payload));
                 break;
-            case MessageType.SAVE_CONFIRMED:
-                saveConfirmedCb.forEach((cb) => cb(msg.payload));
+            case MessageType.RESUME:
+                resumeCb.forEach((cb) => cb(msg.payload));
                 break;
+            case MessageType.END_SESSION:
+                endSessionCb.forEach((cb) => cb(msg.payload));
+                break;
+            case MessageType.SAVE_RESULT: {
+                const resp = msg.payload;
+                const pending = pendingSaves.get(resp.requestId);
+                if (pending) {
+                    clearTimeout(pending.timer);
+                    pendingSaves.delete(resp.requestId);
+                    pending.resolve(resp);
+                }
+                break;
+            }
+            case MessageType.PROGRESS_DATA: {
+                const resp = msg.payload;
+                const pending = pendingLoads.get(resp.requestId);
+                if (pending) {
+                    clearTimeout(pending.timer);
+                    pendingLoads.delete(resp.requestId);
+                    pending.resolve(resp);
+                }
+                break;
+            }
+            case MessageType.ACHIEVEMENT_RESULT: {
+                const resp = msg.payload;
+                const pending = pendingAchievements.get(resp.requestId);
+                if (pending) {
+                    clearTimeout(pending.timer);
+                    pendingAchievements.delete(resp.requestId);
+                    pending.resolve(resp);
+                }
+                break;
+            }
             case MessageType.CAMPAIGN_RESPONSE: {
                 const resp = msg.payload;
                 const pending = pendingCampaigns.get(resp.requestId);
@@ -73,29 +121,38 @@ export function createLobbyClient(options) {
                     pendingCampaigns.delete(resp.requestId);
                     pending.resolve(resp);
                 }
-                campaignResponseCb.forEach((cb) => cb(resp));
                 break;
             }
-            case MessageType.END_SESSION:
-                endSessionCb.forEach((cb) => cb(msg.payload));
+            case MessageType.RESET_RESULT: {
+                const resp = msg.payload;
+                const pending = pendingResets.get(resp.requestId);
+                if (pending) {
+                    clearTimeout(pending.timer);
+                    pendingResets.delete(resp.requestId);
+                    pending.resolve(resp);
+                }
                 break;
-            case MessageType.PAUSE:
-                pauseCb.forEach((cb) => cb(msg.payload));
-                break;
-            case MessageType.RESUME:
-                resumeCb.forEach((cb) => cb(msg.payload));
-                break;
+            }
         }
     }, [lobbyOrigin]);
-    // Callback arrays
-    let pauseCb = [];
-    let resumeCb = [];
-    let sessionContextCb = [];
-    let loadProgressCb = [];
-    let saveConfirmedCb = [];
-    let campaignResponseCb = [];
-    let endSessionCb = [];
+    // ─── Helper: crear promesa request/response con timeout ───
+    const createPending = (map, type, payload, timeoutMs = DEFAULT_TIMEOUT) => {
+        return new Promise((resolve, reject) => {
+            if (destroyed) {
+                reject(new Error('Cliente destruido'));
+                return;
+            }
+            const requestId = createRequestId();
+            const timer = setTimeout(() => {
+                map.delete(requestId);
+                reject(new Error(`Timeout: el lobby no respondió a ${type}`));
+            }, timeoutMs);
+            map.set(requestId, { resolve, reject, timer });
+            send(type, payload, requestId);
+        });
+    };
     const instance = {
+        // ═══ Ciclo de vida ═══
         sendReady: (payload) => {
             if (destroyed)
                 return;
@@ -135,54 +192,60 @@ export function createLobbyClient(options) {
                 return;
             send(MessageType.ERROR, payload);
         },
-        requestSave: (payload) => {
-            if (destroyed)
-                return;
-            send(MessageType.REQUEST_SAVE, payload);
+        // ═══ Persistencia (request/response) ═══
+        saveProgress: (payload) => {
+            return createPending(pendingSaves, MessageType.SAVE_PROGRESS, payload);
+        },
+        loadProgress: (payload) => {
+            return createPending(pendingLoads, MessageType.LOAD_PROGRESS, payload ?? {});
+        },
+        unlockAchievement: (payload) => {
+            return createPending(pendingAchievements, MessageType.UNLOCK_ACHIEVEMENT, payload);
         },
         requestCampaign: (payload) => {
-            return new Promise((resolve, reject) => {
-                if (destroyed) {
-                    reject(new Error('Cliente destruido'));
-                    return;
-                }
-                const requestId = createRequestId();
-                // Timeout de 30s para respuesta de campaña
-                const timer = setTimeout(() => {
-                    pendingCampaigns.delete(requestId);
-                    reject(new Error('Timeout: el lobby no respondió a la solicitud de campaña'));
-                }, 30000);
-                pendingCampaigns.set(requestId, { resolve, reject, timer });
-                send(MessageType.CAMPAIGN_REQUEST, payload, requestId);
-            });
+            return createPending(pendingCampaigns, MessageType.CAMPAIGN_REQUEST, payload, 30000);
         },
-        sendAchievementUnlocked: (payload) => {
-            if (destroyed)
-                return;
-            send(MessageType.ACHIEVEMENT_UNLOCKED, payload);
+        resetProgress: (payload) => {
+            return createPending(pendingResets, MessageType.RESET_PROGRESS, payload ?? {});
         },
+        // ═══ Listeners ═══
+        onSessionContext: (cb) => { sessionContextCb.push(cb); },
         onPause: (cb) => { pauseCb.push(cb); },
         onResume: (cb) => { resumeCb.push(cb); },
-        onSessionContext: (cb) => { sessionContextCb.push(cb); },
-        onLoadProgress: (cb) => { loadProgressCb.push(cb); },
-        onSaveConfirmed: (cb) => { saveConfirmedCb.push(cb); },
         onEndSession: (cb) => { endSessionCb.push(cb); },
+        // ═══ Cleanup ═══
         destroy: () => {
             destroyed = true;
-            listener.unsubscribe();
             responseListener.unsubscribe();
             // Cancelar todas las promesas pendientes
+            for (const [, pending] of pendingSaves) {
+                clearTimeout(pending.timer);
+                pending.reject(new Error('Cliente destruido'));
+            }
+            pendingSaves.clear();
+            for (const [, pending] of pendingLoads) {
+                clearTimeout(pending.timer);
+                pending.reject(new Error('Cliente destruido'));
+            }
+            pendingLoads.clear();
+            for (const [, pending] of pendingAchievements) {
+                clearTimeout(pending.timer);
+                pending.reject(new Error('Cliente destruido'));
+            }
+            pendingAchievements.clear();
             for (const [, pending] of pendingCampaigns) {
                 clearTimeout(pending.timer);
                 pending.reject(new Error('Cliente destruido'));
             }
             pendingCampaigns.clear();
+            for (const [, pending] of pendingResets) {
+                clearTimeout(pending.timer);
+                pending.reject(new Error('Cliente destruido'));
+            }
+            pendingResets.clear();
             pauseCb = [];
             resumeCb = [];
             sessionContextCb = [];
-            loadProgressCb = [];
-            saveConfirmedCb = [];
-            campaignResponseCb = [];
             endSessionCb = [];
         },
     };

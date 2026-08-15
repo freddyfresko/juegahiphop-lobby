@@ -4,6 +4,10 @@
  * Cliente que se usa DENTRO del juego (ejecutándose en un iframe)
  * para comunicarse con el Lobby que lo contiene.
  *
+ * El lobby es el CEREBRO: maneja usuario, sesión, y persistencia.
+ * Los juegos son stateless desde el punto de vista del backend.
+ * Toda lectura/escritura va por postMessage al lobby.
+ *
  * Uso:
  *   import { createLobbyClient } from '@juegahiphop/sdk'
  *
@@ -14,17 +18,22 @@
  *
  *   // Escuchar eventos del lobby
  *   lobby.onPause(() => { /* pausar juego *​/ })
- *   lobby.onResume(() => { /* reanudar *​/ })
  *   lobby.onSessionContext((ctx) => { /* recibir datos del usuario *​/ })
- *   lobby.onLoadProgress((data) => { /* cargar progreso guardado *​/ })
+ *   lobby.onProgressData((data) => { /* cargar progreso guardado *​/ })
  *
- *   // Enviar eventos
+ *   // Guardar/cargar progreso (vía el lobby)
+ *   const result = await lobby.saveProgress({ gameState: { ... }, score: 100 })
+ *   const data = await lobby.loadProgress()
+ *
+ *   // Registrar completion / logro
  *   lobby.sendGameCompleted({ score: 1000, itemId: 'nivel-3' })
+ *   lobby.sendAchievementUnlocked({ achievementId: 'first_win' })
+ *
+ *   // Salir
  *   lobby.sendExitGame({ reason: 'user_quit' })
- *   lobby.requestSave({ gameState: { ... } })
  */
 import type { LobbyClientOptions } from './types';
-import type { GameReadyPayload, GameStartedPayload, GameCompletedPayload, ScoreUpdatedPayload, ExitGamePayload, ErrorPayload, RequestSavePayload, CampaignRequestPayload, AchievementUnlockedPayload, SessionContextPayload, LoadProgressPayload, CampaignResponsePayload, EndSessionPayload, MessageCallback } from './types';
+import type { GameReadyPayload, GameStartedPayload, GameCompletedPayload, ScoreUpdatedPayload, ExitGamePayload, ErrorPayload, SaveProgressPayload, LoadProgressPayload, UnlockAchievementPayload, CampaignRequestPayload, ResetProgressPayload, ResetResultPayload, SessionContextPayload, ProgressDataPayload, SaveResultPayload, AchievementResultPayload, CampaignResponsePayload, EndSessionPayload, MessageCallback } from './types';
 export interface LobbyClientInstance {
     /** Anunciar que el juego terminó de cargar */
     sendReady: (payload: GameReadyPayload) => void;
@@ -40,22 +49,22 @@ export interface LobbyClientInstance {
     sendExitGame: (payload?: ExitGamePayload) => void;
     /** Reportar un error */
     sendError: (payload: ErrorPayload) => void;
-    /** Solicitar guardar progreso */
-    requestSave: (payload: RequestSavePayload) => void;
-    /** Solicitar campaña recompensada — devuelve promesa con la respuesta */
+    /** Guardar el estado del juego en el backend (vía lobby) */
+    saveProgress: (payload: SaveProgressPayload) => Promise<SaveResultPayload>;
+    /** Cargar el estado guardado del juego (vía lobby) */
+    loadProgress: (payload?: LoadProgressPayload) => Promise<ProgressDataPayload>;
+    /** Registrar un logro desbloqueado (vía lobby) */
+    unlockAchievement: (payload: UnlockAchievementPayload) => Promise<AchievementResultPayload>;
+    /** Solicitar campaña recompensada (vía lobby) */
     requestCampaign: (payload: CampaignRequestPayload) => Promise<CampaignResponsePayload>;
-    /** Reportar logro desbloqueado */
-    sendAchievementUnlocked: (payload: AchievementUnlockedPayload) => void;
-    /** Escuchar cuando el lobby pausa el juego */
-    onPause: (cb: MessageCallback) => void;
-    /** Escuchar cuando el lobby reanuda el juego */
-    onResume: (cb: MessageCallback) => void;
+    /** RESETEAR el progreso del juego (vía lobby — borra todo en Supabase) */
+    resetProgress: (payload?: ResetProgressPayload) => Promise<ResetResultPayload>;
     /** Escuchar contexto de sesión (perfil, userId, etc.) */
     onSessionContext: (cb: MessageCallback<SessionContextPayload>) => void;
-    /** Escuchar carga de progreso guardado */
-    onLoadProgress: (cb: MessageCallback<LoadProgressPayload>) => void;
-    /** Escuchar confirmación de guardado */
-    onSaveConfirmed: (cb: MessageCallback) => void;
+    /** Escuchar pausa del lobby */
+    onPause: (cb: MessageCallback) => void;
+    /** Escuchar reanudación del lobby */
+    onResume: (cb: MessageCallback) => void;
     /** Escuchar cierre de sesión */
     onEndSession: (cb: MessageCallback<EndSessionPayload>) => void;
     /** Destruir la instancia y limpiar listeners */

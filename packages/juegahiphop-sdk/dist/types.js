@@ -1,8 +1,15 @@
 /**
  * @juegahiphop/sdk — Tipos del protocolo de comunicación
  *
+ * Copia local sincronizada con packages/juegahiphop-sdk/
+ * Mantener actualizado cuando se modifique el paquete.
+ *
  * Define el formato estándar de todos los mensajes intercambiados
  * entre el Lobby y los juegos mediante postMessage.
+ *
+ * Modelo: el Lobby es el CEREBRO — el único que toca Supabase.
+ * Los juegos son stateless desde el punto de vista del backend.
+ * Toda lectura/escritura de datos va por postMessage al lobby.
  *
  * Convención:
  * - Todos los tipos de mensaje usan prefijo "jh:" (JuegaHipHop)
@@ -12,10 +19,10 @@
  * - protocolVersion para compatibilidad entre versiones
  */
 // ─── Versión del protocolo ───
-export const PROTOCOL_VERSION = '1.0.0';
+export const PROTOCOL_VERSION = '2.0.0';
 // ─── Tipos de mensaje ───
 export const MessageType = {
-    // ═══ Game → Lobby ═══
+    // ═══ Game → Lobby: Ciclo de vida ═══
     /** El juego terminó de cargar y está listo */
     GAME_READY: 'jh:game_ready',
     /** El usuario empezó una partida */
@@ -30,27 +37,41 @@ export const MessageType = {
     EXIT_GAME: 'jh:exit_game',
     /** Error desde el juego */
     ERROR: 'jh:error',
-    /** El juego solicita que se guarde el progreso actual */
-    REQUEST_SAVE: 'jh:request_save',
+    // ═══ Game → Lobby: Persistencia (lobby = cerebro) ═══
+    /** El juego solicita guardar su estado completo */
+    SAVE_PROGRESS: 'jh:save_progress',
+    /** El juego solicita cargar su estado guardado */
+    LOAD_PROGRESS: 'jh:load_progress',
+    /** El juego solicita registrar un logro desbloqueado */
+    UNLOCK_ACHIEVEMENT: 'jh:unlock_achievement',
     /** El juego solicita visualizar una campaña recompensada */
     CAMPAIGN_REQUEST: 'jh:campaign_request',
-    /** El juego notifica un logro desbloqueado */
-    ACHIEVEMENT_UNLOCKED: 'jh:achievement_unlocked',
-    // ═══ Lobby → Game ═══
+    /** El juego solicita RESETEAR su progreso (empezar de 0) */
+    RESET_PROGRESS: 'jh:reset_progress',
+    // ═══ Lobby → Game: Respuestas a solicitudes ═══
+    /** Respuesta a save_progress (éxito/error) */
+    SAVE_RESULT: 'jh:save_result',
+    /** Respuesta a load_progress (datos guardados) */
+    PROGRESS_DATA: 'jh:progress_data',
+    /** Respuesta a unlock_achievement (éxito/error) */
+    ACHIEVEMENT_RESULT: 'jh:achievement_result',
+    /** Respuesta a campaign_request */
+    CAMPAIGN_RESPONSE: 'jh:campaign_response',
+    /** Respuesta a reset_progress (éxito/error) */
+    RESET_RESULT: 'jh:reset_result',
+    // ═══ Lobby → Game: Contexto y control ═══
+    /** Contexto de sesión: perfil, progreso, configuración */
+    SESSION_CONTEXT: 'jh:session_context',
+    /** Confirmación de guardado exitoso (legacy — usar SAVE_RESULT) */
+    SAVE_CONFIRMED: 'jh:save_confirmed',
     /** Pausar el juego */
     PAUSE: 'jh:pause',
     /** Reanudar el juego */
     RESUME: 'jh:resume',
-    /** Contexto de sesión: perfil, progreso, configuración */
-    SESSION_CONTEXT: 'jh:session_context',
-    /** Cargar progreso guardado en el juego */
-    LOAD_PROGRESS: 'jh:load_progress',
-    /** Confirmación de guardado exitoso */
-    SAVE_CONFIRMED: 'jh:save_confirmed',
-    /** Respuesta a una solicitud de campaña recompensada */
-    CAMPAIGN_RESPONSE: 'jh:campaign_response',
     /** El lobby cierra la sesión de juego */
     END_SESSION: 'jh:end_session',
+    /** El lobby notifica el tamaño real del viewport del iframe (resize, fullscreen, orientación) */
+    VIEWPORT_CHANGED: 'jh:viewport_changed',
 };
 // ─── Versión del protocolo — funciones helpers ───
 /** Verifica compatibilidad entre versiones del protocolo */

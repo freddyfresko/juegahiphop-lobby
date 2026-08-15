@@ -1,6 +1,9 @@
 /**
  * @juegahiphop/sdk — Helpers de mensajes postMessage
  *
+ * Copia local sincronizada con packages/juegahiphop-sdk/
+ * Mantener actualizado cuando se modifique el paquete.
+ *
  * Funciones para crear, enviar, validar y recibir mensajes
  * del protocolo JuegaHipHop.
  */

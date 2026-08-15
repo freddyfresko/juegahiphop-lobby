@@ -1,6 +1,9 @@
 /**
  * @juegahiphop/sdk — Helpers de mensajes postMessage
  *
+ * Copia local sincronizada con packages/juegahiphop-sdk/
+ * Mantener actualizado cuando se modifique el paquete.
+ *
  * Funciones para crear, enviar, validar y recibir mensajes
  * del protocolo JuegaHipHop.
  */
@@ -67,17 +70,23 @@ export function connectGameCallbacks(listener, handlers, allowedOrigins) {
             case 'jh:session_context':
                 handlers.onSessionContext?.(msg.payload);
                 break;
-            case 'jh:load_progress':
-                handlers.onLoadProgress?.(msg.payload);
+            case 'jh:progress_data':
+                handlers.onProgressData?.(msg.payload);
                 break;
-            case 'jh:save_confirmed':
-                handlers.onSaveConfirmed?.(msg.payload);
+            case 'jh:save_result':
+                handlers.onSaveResult?.(msg.payload);
+                break;
+            case 'jh:achievement_result':
+                handlers.onAchievementResult?.(msg.payload);
                 break;
             case 'jh:campaign_response':
                 handlers.onCampaignResponse?.(msg.payload);
                 break;
             case 'jh:end_session':
                 handlers.onEndSession?.(msg.payload);
+                break;
+            case 'jh:viewport_changed':
+                handlers.onViewportChanged?.(msg.payload);
                 break;
         }
     }, allowedOrigins);
@@ -113,14 +122,17 @@ export function connectLobbyCallbacks(handlers, allowedOrigins) {
             case 'jh:error':
                 handlers.onError?.(msg.payload);
                 break;
-            case 'jh:request_save':
-                handlers.onRequestSave?.(msg.payload);
+            case 'jh:save_progress':
+                handlers.onSaveProgress?.(msg.payload);
+                break;
+            case 'jh:load_progress':
+                handlers.onLoadProgress?.(msg.payload);
+                break;
+            case 'jh:unlock_achievement':
+                handlers.onUnlockAchievement?.(msg.payload);
                 break;
             case 'jh:campaign_request':
                 handlers.onCampaignRequest?.(msg.payload);
-                break;
-            case 'jh:achievement_unlocked':
-                handlers.onAchievementUnlocked?.(msg.payload);
                 break;
         }
     }, allowedOrigins);

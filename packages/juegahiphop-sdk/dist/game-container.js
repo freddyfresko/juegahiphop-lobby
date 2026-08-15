@@ -1,23 +1,14 @@
 /**
  * @juegahiphop/sdk — GameContainer
  *
+ * Copia local sincronizada con packages/juegahiphop-sdk/
+ * Mantener actualizado cuando se modifique el paquete.
+ *
  * Cliente que se usa en el LOBBY para comunicarse con un juego
  * ejecutándose dentro de un iframe.
  *
- * Uso:
- *   import { createGameClient } from '@juegahiphop/sdk'
- *
- *   const game = createGameClient(iframeRef.current, {
- *     allowedOrigins: ['https://fighters.juegahiphop.cl'],
- *   })
- *
- *   game.onGameReady(() => { /* ocultar loading *​/ })
- *   game.onGameCompleted((data) => { /* guardar puntaje *​/ })
- *   game.onExitGame(() => { /* volver al lobby *​/ })
- *   game.onRequestSave((data) => { /* persistir gameState *​/ })
- *
- *   // Limpiar al destruir el contenedor
- *   game.destroy()
+ * El lobby es el CEREBRO: recibe solicitudes del juego (save, load,
+ * unlock achievement, campaign) y responde con confirmaciones.
  */
 import { MessageType, PROTOCOL_VERSION } from './types';
 import { isProtocolCompatible } from './types';
@@ -51,6 +42,7 @@ export function createGameClient(iframe, options) {
             return;
         if (data.source !== 'game')
             return;
+        const requestId = data.requestId;
         switch (data.type) {
             case MessageType.GAME_READY: {
                 clearTimeout(readyTimer);
@@ -83,14 +75,20 @@ export function createGameClient(iframe, options) {
             case MessageType.ERROR:
                 errorCb.forEach((cb) => cb(data.payload));
                 break;
-            case MessageType.REQUEST_SAVE:
-                requestSaveCb.forEach((cb) => cb(data.payload));
+            case MessageType.SAVE_PROGRESS:
+                saveProgressCb.forEach((cb) => cb({ ...data.payload, _requestId: requestId }));
+                break;
+            case MessageType.LOAD_PROGRESS:
+                loadProgressCb.forEach((cb) => cb({ ...data.payload, _requestId: requestId }));
+                break;
+            case MessageType.UNLOCK_ACHIEVEMENT:
+                unlockAchievementCb.forEach((cb) => cb({ ...data.payload, _requestId: requestId }));
                 break;
             case MessageType.CAMPAIGN_REQUEST:
-                campaignRequestCb.forEach((cb) => cb(data.payload));
+                campaignRequestCb.forEach((cb) => cb({ ...data.payload, _requestId: requestId }));
                 break;
-            case MessageType.ACHIEVEMENT_UNLOCKED:
-                achievementUnlockedCb.forEach((cb) => cb(data.payload));
+            case MessageType.RESET_PROGRESS:
+                resetProgressCb.forEach((cb) => cb({ ...data.payload, _requestId: requestId }));
                 break;
         }
     };
@@ -123,10 +121,13 @@ export function createGameClient(iframe, options) {
     let requestFullscreenCb = [];
     let exitGameCb = [];
     let errorCb = [];
-    let requestSaveCb = [];
+    let saveProgressCb = [];
+    let loadProgressCb = [];
+    let unlockAchievementCb = [];
     let campaignRequestCb = [];
-    let achievementUnlockedCb = [];
+    let resetProgressCb = [];
     const instance = {
+        // ═══ Listeners ═══
         onGameReady: (cb) => { gameReadyCb.push(cb); },
         onGameStarted: (cb) => { gameStartedCb.push(cb); },
         onGameCompleted: (cb) => { gameCompletedCb.push(cb); },
@@ -134,16 +135,23 @@ export function createGameClient(iframe, options) {
         onRequestFullscreen: (cb) => { requestFullscreenCb.push(cb); },
         onExitGame: (cb) => { exitGameCb.push(cb); },
         onError: (cb) => { errorCb.push(cb); },
-        onRequestSave: (cb) => { requestSaveCb.push(cb); },
+        onSaveProgress: (cb) => { saveProgressCb.push(cb); },
+        onLoadProgress: (cb) => { loadProgressCb.push(cb); },
+        onUnlockAchievement: (cb) => { unlockAchievementCb.push(cb); },
         onCampaignRequest: (cb) => { campaignRequestCb.push(cb); },
-        onAchievementUnlocked: (cb) => { achievementUnlockedCb.push(cb); },
-        sendSessionContext: (payload) => sendToGame(MessageType.SESSION_CONTEXT, payload),
-        sendLoadProgress: (payload) => sendToGame(MessageType.LOAD_PROGRESS, payload),
-        sendSaveConfirmed: () => sendToGame(MessageType.SAVE_CONFIRMED, undefined),
+        onResetProgress: (cb) => { resetProgressCb.push(cb); },
+        // ═══ Respuestas ═══
+        sendSaveResult: (payload) => sendToGame(MessageType.SAVE_RESULT, payload, payload.requestId),
+        sendProgressData: (payload) => sendToGame(MessageType.PROGRESS_DATA, payload, payload.requestId),
+        sendAchievementResult: (payload) => sendToGame(MessageType.ACHIEVEMENT_RESULT, payload, payload.requestId),
         sendCampaignResponse: (payload) => sendToGame(MessageType.CAMPAIGN_RESPONSE, payload, payload.requestId),
+        sendResetResult: (payload) => sendToGame(MessageType.RESET_RESULT, payload, payload.requestId),
+        // ═══ Contexto ═══
+        sendSessionContext: (payload) => sendToGame(MessageType.SESSION_CONTEXT, payload),
         sendEndSession: (payload) => sendToGame(MessageType.END_SESSION, payload ?? { reason: 'navigate_away' }),
         sendPause: () => sendToGame(MessageType.PAUSE, undefined),
         sendResume: () => sendToGame(MessageType.RESUME, undefined),
+        sendViewportChanged: (payload) => sendToGame(MessageType.VIEWPORT_CHANGED, payload),
         get gameProtocolVersion() { return _gameProtocolVersion; },
         ready: readyPromise,
         destroy: () => {
@@ -157,9 +165,11 @@ export function createGameClient(iframe, options) {
             requestFullscreenCb = [];
             exitGameCb = [];
             errorCb = [];
-            requestSaveCb = [];
+            saveProgressCb = [];
+            loadProgressCb = [];
+            unlockAchievementCb = [];
             campaignRequestCb = [];
-            achievementUnlockedCb = [];
+            resetProgressCb = [];
         },
     };
     return instance;
