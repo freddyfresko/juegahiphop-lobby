@@ -6,6 +6,7 @@ import { useState, useCallback } from 'react'
 import { setGameStatus, deleteGame, reorderGames } from '@/lib/admin-actions'
 import BannerManager from './BannerManager'
 import CampaignManager from './CampaignManager'
+import CampaignAnalytics from './CampaignAnalytics'
 import Logo from '@/components/Logo'
 import type { GameCatalogEntry, Banner, CampaignEntry } from '@/lib/types'
 
@@ -276,6 +277,9 @@ export default function AdminDashboard({ games, banners, campaigns, userEmail }:
 
         {/* ─── Banners Section ─── */}
         <BannerManager banners={banners} />
+
+        {/* ─── Campaign Analytics (dashboard pro) ─── */}
+        <CampaignAnalytics />
 
         {/* ─── Campaigns / Ad Manager Section ─── */}
         <CampaignManager campaigns={campaigns} games={games} />

@@ -21,6 +21,7 @@ import { selectCampaign, trackImpression } from '@/lib/campaign-manager'
 import type { SelectedCampaign } from '@/lib/campaign-manager'
 import type { CampaignPlacement } from '@/lib/types'
 import AdOverlay, { type AdResult } from '@/components/AdOverlay'
+import { getSessionId, newViewId } from '@/lib/session'
 
 // ─── Estados del contenedor ───
 
@@ -69,6 +70,10 @@ export default function GameContainer({
     placement: CampaignPlacement
     requestId: string
     rewardIds: string[]
+    /** UUID de esta visualización — conecta shown → clicked/dismissed y viaja como ?jh_click= */
+    viewId: string
+    /** Timestamp de cuando se mostró (para medir duración de vista) */
+    shownAt: number
   } | null>(null)
 
   const supabase = createClient()
@@ -607,16 +612,19 @@ export default function GameContainer({
         return
       }
 
-      // Registrar impresión (shown)
+      // Registrar impresión (shown) — con sesión anónima y viewId
+      const viewId = newViewId()
       await trackImpression(supabase, campaign.id, 'shown', {
         userId,
         gameId: slug,
         placement,
+        sessionId: getSessionId(),
+        viewId,
       })
 
       // Mostrar el overlay (el juego se pausa implícitamente porque
       // el overlay cubre toda la pantalla)
-      setActiveAd({ campaign, placement, requestId, rewardIds })
+      setActiveAd({ campaign, placement, requestId, rewardIds, viewId, shownAt: Date.now() })
     })
 
     gameClient.onExitGame(async (payload) => {
@@ -752,6 +760,9 @@ export default function GameContainer({
         userId,
         gameId: slug,
         placement: ad.placement,
+        sessionId: getSessionId(),
+        viewId: ad.viewId,
+        viewDurationSeconds: Math.max(0, Math.round((Date.now() - ad.shownAt) / 1000)),
       })
 
       // Responder al juego según el resultado
@@ -936,6 +947,7 @@ export default function GameContainer({
           placement={activeAd.placement}
           gameId={slug}
           userId={userId}
+          viewId={activeAd.viewId}
           onComplete={handleAdComplete}
         />
       )}

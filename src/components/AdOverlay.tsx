@@ -12,6 +12,8 @@ interface AdOverlayProps {
   placement: CampaignPlacement
   gameId: string | null
   userId: string | null
+  /** UUID de esta visualización — viaja como ?jh_click= en la URL del destino */
+  viewId: string
   onComplete: (result: AdResult) => void
 }
 
@@ -38,6 +40,8 @@ export interface AdResult {
 export default function AdOverlay({
   campaign,
   placement,
+  gameId,
+  viewId,
   onComplete,
 }: AdOverlayProps) {
   const isRewarded =
@@ -117,10 +121,24 @@ export default function AdOverlay({
 
   const handleCtaClick = useCallback(() => {
     if (campaign.destination_url) {
-      window.open(campaign.destination_url, '_blank', 'noopener,noreferrer')
+      // Atribución: UTMs para que la tienda/sponsor vea el tráfico del lobby
+      // en su analytics + jh_click (viewId) para cerrar el loop de conversión.
+      try {
+        const url = new URL(campaign.destination_url, window.location.origin)
+        url.searchParams.set('utm_source', 'juegahiphop')
+        url.searchParams.set('utm_medium', 'campaign')
+        url.searchParams.set('utm_campaign', campaign.id)
+        url.searchParams.set('utm_content', placement)
+        if (gameId) url.searchParams.set('utm_term', gameId)
+        url.searchParams.set('jh_click', viewId)
+        window.open(url.toString(), '_blank', 'noopener,noreferrer')
+      } catch {
+        // URL inválida → abrir tal cual
+        window.open(campaign.destination_url, '_blank', 'noopener,noreferrer')
+      }
     }
     handleComplete('clicked')
-  }, [campaign.destination_url, handleComplete])
+  }, [campaign.destination_url, campaign.id, placement, gameId, viewId, handleComplete])
 
   const handleDismiss = useCallback(() => {
     if (!canClose) return

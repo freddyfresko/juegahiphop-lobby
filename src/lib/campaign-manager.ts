@@ -58,6 +58,12 @@ export async function selectCampaign(
 /**
  * Registra una impresión (event='shown', 'clicked', etc.) en campaign_impressions.
  * También incrementa el contador correspondiente en la tabla campaigns vía RPC.
+ *
+ * Enriquecimiento PRO:
+ *   - sessionId: identidad anónima persistente del navegador (guests).
+ *   - viewId: UUID de la visualización — conecta shown → clicked/dismissed
+ *     de la misma vista y viaja como ?jh_click= en la URL del destino.
+ *   - viewDurationSeconds: segundos que el ad estuvo visible.
  */
 export async function trackImpression(
   supabase: SupabaseClient,
@@ -67,6 +73,9 @@ export async function trackImpression(
     userId?: string | null
     gameId?: string | null
     placement?: CampaignPlacement
+    sessionId?: string | null
+    viewId?: string | null
+    viewDurationSeconds?: number | null
     metadata?: Record<string, unknown>
   } = {},
 ): Promise<void> {
@@ -77,7 +86,14 @@ export async function trackImpression(
     game_id: options.gameId ?? null,
     placement: options.placement ?? 'game_results',
     event,
-    metadata: options.metadata ?? {},
+    session_id: options.sessionId ?? null,
+    metadata: {
+      ...(options.metadata ?? {}),
+      ...(options.viewId ? { view_id: options.viewId } : {}),
+      ...(options.viewDurationSeconds != null
+        ? { view_duration_seconds: options.viewDurationSeconds }
+        : {}),
+    },
   })
 
   // Incrementar contador en campaigns
