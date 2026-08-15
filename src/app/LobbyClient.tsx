@@ -112,7 +112,9 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
             .maybeSingle(),
           supabase
             .from('game_state')
-            .select('game_id, state, total_plays, best_score, total_playtime_seconds, completions_count')
+            // ⚡ Solo agregados — NO traer `state` (JSONB pesado de la Sopa):
+            // computeProgress usa total_plays/completions_count, no el estado crudo.
+            .select('game_id, total_plays, best_score, total_playtime_seconds, completions_count')
             .eq('user_id', u.id),
           supabase
             .rpc('is_admin'),
@@ -129,7 +131,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
             )
             map[game.slug] = computeProgress(
               game,
-              (row?.state as Record<string, unknown>) ?? null,
+              null, // state crudo no se trae (JSONB pesado) — computeProgress no lo usa
               row?.total_plays ?? 0,
             )
           }

@@ -197,6 +197,30 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
     router.refresh()
   }, [router])
 
+  /** Juego en espera de confirmación de reset (null = ninguno) */
+  const [confirmResetGame, setConfirmResetGame] = useState<string | null>(null)
+  const [resettingGame, setResettingGame] = useState<string | null>(null)
+
+  /** Resetear progreso de un juego → RPC server-side (borra todo en 1 transacción) */
+  const handleResetGame = useCallback(async (gameId: string) => {
+    if (resettingGame) return
+    setResettingGame(gameId)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.rpc('reset_game_progress', { p_game_id: gameId })
+      if (error) throw error
+      // Recargar stats del perfil para reflejar el reset
+      router.refresh()
+      window.location.reload()
+    } catch (err) {
+      console.warn('[Perfil] Error reseteando progreso:', err)
+      alert('No se pudo resetear el progreso. Intenta de nuevo.')
+      setConfirmResetGame(null)
+    } finally {
+      setResettingGame(null)
+    }
+  }, [resettingGame, router])
+
   const gameName = (slug: string) => games.find((g) => g.slug === slug)?.name ?? slug
   const gameEmoji = (slug: string) => games.find((g) => g.slug === slug)?.emoji ?? '🎮'
   const gameColor = (slug: string) => games.find((g) => g.slug === slug)?.accent_color
@@ -370,6 +394,8 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
                 <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
                   {gameStats.map((stat, i) => {
                     const color = gameColor(stat.game_id)
+                    const confirming = confirmResetGame === stat.game_id
+                    const resetting = resettingGame === stat.game_id
                     return (
                       <div
                         key={stat.game_id}
@@ -412,6 +438,38 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
                             </div>
                             <div className="text-[9px] uppercase tracking-wider text-zinc-600">Última vez</div>
                           </div>
+                        </div>
+
+                        {/* Reset del juego — 2 pasos: REINICIAR → ¿SEGURO? */}
+                        <div className="shrink-0">
+                          {confirming ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleResetGame(stat.game_id)}
+                                disabled={!!resetting}
+                                className="rounded-lg bg-red-500 px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-red-400 disabled:opacity-50"
+                                type="button"
+                              >
+                                {resetting ? '…' : 'SÍ, BORRAR'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmResetGame(null)}
+                                className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400 transition-colors hover:text-white"
+                                type="button"
+                              >
+                                NO
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmResetGame(stat.game_id)}
+                              className="rounded-lg border border-red-400/20 px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider text-red-400/70 transition-colors hover:border-red-400/40 hover:text-red-400"
+                              type="button"
+                              title={`Reiniciar ${gameName(stat.game_id)} desde cero`}
+                            >
+                              REINICIAR
+                            </button>
+                          )}
                         </div>
                       </div>
                     )
