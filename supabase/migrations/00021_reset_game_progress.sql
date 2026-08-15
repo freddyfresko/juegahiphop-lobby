@@ -35,9 +35,14 @@ BEGIN
     RAISE EXCEPTION 'Debes iniciar sesión para resetear tu progreso';
   END IF;
 
-  -- 1. Progreso versionado (canónico)
-  DELETE FROM user_game_progress
-  WHERE user_id = v_user_id AND game_id = p_game_id;
+  -- 1. Progreso versionado (canónico) — SOLO si la tabla existe.
+  --    (user_game_progress es legacy de 00004; en DBs donde se aplicó
+  --    00004b nunca se creó y el DELETE crudo rompía TODA la RPC con
+  --    42P01 → el reset del server no borraba nada — bug ago-2026)
+  IF to_regclass('public.user_game_progress') IS NOT NULL THEN
+    DELETE FROM user_game_progress
+    WHERE user_id = v_user_id AND game_id = p_game_id;
+  END IF;
 
   -- 2. Agregados legacy + state JSONB (la Sopa la usa en save/load)
   DELETE FROM game_state
