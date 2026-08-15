@@ -338,7 +338,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                     </h2>
                     <div className="h-px flex-1 bg-gradient-to-r from-yellow-400/30 to-transparent" />
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {featuredGames.map((game, i) => (
                       <FeaturedCard key={game.slug} game={game} progress={progressMap[game.slug] ?? null} index={i} />
                     ))}
@@ -497,7 +497,8 @@ function FeaturedCard({
       className="group relative block overflow-hidden rounded-2xl border border-white/[0.06] transition-all duration-300 hover:-translate-y-1"
       style={{ animationDelay: `${index * 100}ms` }}
     >
-      <div className="relative aspect-[16/8] w-full overflow-hidden sm:aspect-[16/7]">
+      {/* ═══ Portada CUADRADA limpia (misma línea que GameCard) ═══ */}
+      <div className="relative aspect-square w-full overflow-hidden">
         {game.image_url ? (
           <img
             src={`${game.image_url}?v=${new Date(game.updated_at).getTime()}`}
@@ -516,11 +517,10 @@ function FeaturedCard({
           </div>
         )}
 
-        {/* Gradientes */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/40 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/70 via-transparent to-transparent" />
+        {/* Gradiente sutil inferior (no tapa la imagen) */}
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0a0a0a]/50 to-transparent" />
 
-        {/* Badge */}
+        {/* Badge DESTACADO */}
         <div
           className="absolute left-3 top-3 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-black"
           style={{ backgroundColor: accentColor }}
@@ -528,47 +528,64 @@ function FeaturedCard({
           DESTACADO
         </div>
 
-        {/* Info sobre la portada */}
-        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5 sm:p-6">
-          <div className="min-w-0">
-            <h3 className="font-archivo text-2xl leading-tight tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] sm:text-3xl" style={{ color: accentColor }}>
-              {game.name}
-            </h3>
-            <p className="mt-1.5 line-clamp-2 max-w-md text-[10px] uppercase leading-relaxed tracking-wider text-zinc-200 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
-              {game.short_description}
-            </p>
-
-            {progress && progress.total > 0 && (
-              <div className="mt-2 max-w-xs">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[9px] uppercase tracking-wider text-zinc-400">{progress.label}</span>
-                  <span className="text-[10px] font-bold" style={{ color: accentColor }}>
-                    {progress.current}/{progress.total}
-                  </span>
-                </div>
-                <div className="h-1 overflow-hidden rounded-full bg-white/[0.08]">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ backgroundColor: accentColor, width: `${progressPct}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Botón JUGAR */}
+        {/* Overlay hover con botón JUGAR */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-110"
+            className="flex h-16 w-16 scale-75 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-100"
             style={{
               backgroundColor: `${accentColor}ee`,
-              boxShadow: `0 0 0 6px ${accentColor}22`,
+              boxShadow: `0 0 0 8px ${accentColor}22, 0 0 40px ${accentColor}88`,
             }}
           >
-            <svg className="ml-0.5 h-5 w-5 text-black" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="ml-1 h-7 w-7 text-black" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
           </div>
         </div>
+      </div>
+
+      {/* ═══ Pie: título + descripción FUERA del cuadrado ═══ */}
+      <div className="bg-[#0d0d0d] p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-archivo text-xl leading-tight tracking-wide" style={{ color: accentColor }}>
+            {game.name}
+          </h3>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            {game.status === 'beta' && (
+              <span
+                className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                style={{ backgroundColor: `${accentColor}33`, color: accentColor }}
+              >
+                Beta
+              </span>
+            )}
+            <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-300">
+              {game.category && game.category !== 'games' ? game.category : 'Destacado'}
+            </span>
+          </div>
+        </div>
+
+        <p className="mt-1 line-clamp-2 text-[11px] uppercase leading-relaxed tracking-wide text-zinc-500">
+          {game.short_description}
+        </p>
+
+        {progress && progress.total > 0 && (
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-[9px] uppercase tracking-wider text-zinc-600">{progress.label}</span>
+              <span className="text-[10px] font-bold" style={{ color: accentColor }}>
+                {progress.current}/{progress.total}
+              </span>
+            </div>
+            <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ backgroundColor: accentColor, width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </a>
   )
