@@ -59,6 +59,16 @@ npm install @juegahiphop/sdk
 # (mantenla sincronizada con packages/juegahiphop-sdk/)
 ```
 
+> ⚠️ **ACTUALIZACIÓN PROTOCOLO v2 (ago-2026):** si tu copia local del SDK
+> no tiene `resetProgress()` ni el campo `progress` en `saveProgress`,
+> está desactualizada. **Actualízala copiando estos archivos desde
+> `packages/juegahiphop-sdk/src/`** (o desde el lobby `src/lib/sdk/`):
+> - `types.ts` — debe tener `RESET_PROGRESS`/`RESET_RESULT` y `SaveProgressPayload.progress`
+> - `lobby-client.ts` — debe tener `resetProgress()`
+> - `messages.ts` — sincronizado con el protocolo v2
+>
+> `sopadeletras/src/lib/sdk/` es un ejemplo de copia local (puede estar atrasada).
+
 **Estructura del SDK** (`src/lib/sdk/`):
 ```
 sdk/
@@ -395,6 +405,7 @@ INSERT INTO games (
 - [ ] `onSessionContext` → mostrar nombre/avatar/level si hay sesión
 - [ ] `onViewportChanged` → layout responsive
 - [ ] `onEndSession` / `onPause` / `onResume` → pausar el juego
+- [ ] Copia local del SDK actualizada al **protocolo v2** (`resetProgress()` + `progress` en `saveProgress` — ver sección 3)
 
 **Partida y ranking:**
 - [ ] `sendGameStarted({ difficulty })` al iniciar
