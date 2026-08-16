@@ -1,8 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import type { PlayerProfile } from '@/lib/types'
 import Link from 'next/link'
@@ -53,6 +51,12 @@ const NAV_ITEMS: { label: string; href: string; icon: React.ReactNode }[] = [
   },
 ]
 
+const ADMIN_ICON = (
+  <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437 1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008Z" />
+  </svg>
+)
+
 interface SidebarProps {
   user: User | null
   profile?: PlayerProfile | null
@@ -60,249 +64,139 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ user, profile, isAdmin }: SidebarProps) {
-  const router = useRouter()
   const pathname = usePathname()
-  const [menuOpen, setMenuOpen] = useState(false)
 
-  const handleSignOut = useCallback(async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/')
-    router.refresh()
-  }, [router])
-
-  const isActive = (href: string) => {
+  // Activación ESTRICTA: marca solo la página actual.
+  // Las anclas tipo /#juegos (sección dentro del home) NUNCA marcan la barra,
+  // así no aparecen dos dots amarillos a la vez en el home.
+  const isActivePage = (href: string) => {
+    if (href.includes('#')) return false
     if (href === '/') return pathname === '/'
-    if (href === '/#juegos') return pathname === '/' // sección dentro del home
     return pathname.startsWith(href)
   }
 
-  const navLink = (item: (typeof NAV_ITEMS)[number], extraClass = '') => {
-    const active = isActive(item.href)
-    return (
-      <a
-        key={item.label}
-        href={item.href}
-        onClick={() => setMenuOpen(false)}
-        className={`flex min-h-11 items-center gap-3 rounded-xl px-3.5 text-xs font-bold uppercase tracking-[0.15em] transition-all ${
-          active
-            ? 'border-l-2 border-yellow-400 bg-yellow-400/10 text-yellow-400'
-            : 'border-l-2 border-transparent text-zinc-400 hover:bg-white/[0.05] hover:text-white'
-        } ${extraClass}`}
-      >
-        <span className={active ? 'text-yellow-400' : 'text-zinc-500 group-hover:text-zinc-300'}>{item.icon}</span>
-        {item.label}
-      </a>
-    )
-  }
-
-  // ─── Panel lateral (desktop y drawer móvil comparten contenido) ───
-
-  const panelContent = (
-    <div className="flex h-full flex-col">
-      {/* Logo */}
-      <div className="flex h-16 shrink-0 items-center border-b border-white/[0.06] px-5">
-        <Link href="/" className="flex items-center" aria-label="Juega Hip Hop — Inicio">
-          <Logo size="header" priority />
-        </Link>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex flex-1 flex-col gap-1.5 overflow-y-auto px-3 py-5">
-        {NAV_ITEMS.map((item) => navLink(item))}
-
-        {isAdmin && (
-          <a
-            href="/admin"
-            onClick={() => setMenuOpen(false)}
-            className={`flex min-h-11 items-center gap-3 rounded-xl border-l-2 px-3.5 text-xs font-bold uppercase tracking-[0.15em] transition-all ${
-              pathname.startsWith('/admin')
-                ? 'border-yellow-400 bg-yellow-400/10 text-yellow-400'
-                : 'border-transparent text-zinc-500 hover:bg-white/[0.05] hover:text-yellow-400'
-            }`}
-          >
-            <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437 1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008Z" />
-            </svg>
-            ADMIN
-          </a>
-        )}
-      </nav>
-
-      {/* User card */}
-      <div className="shrink-0 border-t border-white/[0.06] p-3">
-        {user ? (
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
-            <Link href="/perfil" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 text-sm font-black text-black">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  user.email?.charAt(0).toUpperCase() || '?'
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-semibold text-white">
-                  {profile?.display_name || user.email?.split('@')[0] || 'USER'}
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-yellow-400">
-                  <span>NIVEL {profile?.level || 1}</span>
-                  <span className="text-zinc-700">·</span>
-                  <span className="text-zinc-400">{profile?.xp?.toLocaleString() ?? 0} XP</span>
-                </div>
-              </div>
-            </Link>
-            <button
-              onClick={handleSignOut}
-              className="mt-2.5 flex w-full min-h-9 items-center justify-center gap-1.5 rounded-lg border border-red-400/10 px-3 text-[10px] font-bold uppercase tracking-wider text-red-400/70 transition-colors hover:bg-red-400/10 hover:text-red-400"
-              type="button"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
-              </svg>
-              SALIR
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <a
-              href="/login"
-              className="flex min-h-10 items-center justify-center rounded-xl border border-yellow-400/30 bg-yellow-400/10 px-3 text-[11px] font-bold uppercase tracking-wider text-yellow-400 transition-colors hover:bg-yellow-400/20"
-            >
-              INICIAR SESIÓN
-            </a>
-            <a
-              href="/login?view=register"
-              className="flex min-h-10 items-center justify-center rounded-xl bg-yellow-400 px-3 text-[11px] font-black uppercase tracking-wider text-black transition-colors hover:bg-yellow-300"
-            >
-              CREAR CUENTA
-            </a>
-          </div>
-        )}
-      </div>
-    </div>
+  // Link de icono reutilizable (dot amarillo cuando activo)
+  const iconLink = (
+    href: string,
+    label: string,
+    icon: React.ReactNode,
+    active: boolean,
+    extraClass = '',
+    hoverClass = 'active:bg-white/[0.06] active:text-zinc-300',
+  ) => (
+    <a
+      key={label}
+      href={href}
+      aria-label={label}
+      title={label}
+      className={`relative flex items-center justify-center rounded-xl transition-all ${extraClass} ${
+        active ? 'text-yellow-400' : `text-zinc-500 ${hoverClass}`
+      }`}
+    >
+      {icon}
+      {active && <span className="absolute bottom-1 h-1 w-1 rounded-full bg-yellow-400" />}
+    </a>
   )
 
-  const adminIcon = (
-    <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437 1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008Z" />
-    </svg>
+  // Avatar de cuenta (sesión) o acceso a login (invitado)
+  const accountOnPerfil = pathname.startsWith('/perfil')
+  const accountSlot = user ? (
+    <a
+      href="/perfil"
+      aria-label="Mi perfil"
+      title="Mi perfil"
+      className={`relative flex items-center justify-center rounded-xl transition-all ${
+        accountOnPerfil ? '' : 'active:bg-white/[0.06]'
+      }`}
+    >
+      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 text-sm font-black text-black ring-2 ring-yellow-400/40">
+        {profile?.avatar_url ? (
+          <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          user.email?.charAt(0).toUpperCase() || '?'
+        )}
+      </div>
+      {accountOnPerfil && <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-yellow-400" />}
+    </a>
+  ) : (
+    <a
+      href="/login"
+      aria-label="Iniciar sesión"
+      title="Iniciar sesión"
+      className="relative flex items-center justify-center rounded-xl text-zinc-500 transition-all active:bg-white/[0.06] active:text-yellow-400"
+    >
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+      </svg>
+    </a>
   )
 
   return (
     <>
-      {/* ─── Desktop sidebar (lg+) ─── */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-white/[0.06] bg-[#0d0d0d]/95 backdrop-blur-xl lg:block">
-        {panelContent}
-      </aside>
-
-      {/* ─── Mobile mini sidebar (rail de iconos, siempre visible <lg) ─── */}
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-14 flex-col items-center border-r border-white/[0.06] bg-[#0d0d0d]/95 backdrop-blur-xl lg:hidden">
-        {/* Logo */}
-        <div className="safe-area-top flex h-16 w-full shrink-0 items-center justify-center">
-          <Link href="/" aria-label="Juega Hip Hop — Inicio" onClick={() => setMenuOpen(false)}>
-            <Logo size="sm" />
+      {/* ─── Desktop top nav (lg+, barra fija arriba) ─── */}
+      <header className="fixed inset-x-0 top-0 z-40 hidden h-16 border-b border-white/[0.06] bg-[#0d0d0d]/95 backdrop-blur-xl lg:block">
+        <div className="safe-area-top relative mx-auto h-full max-w-7xl px-6">
+          {/* Logo — izquierda */}
+          <Link
+            href="/"
+            aria-label="Juega Hip Hop — Inicio"
+            className="absolute left-6 top-1/2 shrink-0 -translate-y-1/2"
+          >
+            <Logo size="header" priority />
           </Link>
-        </div>
 
-        {/* Nav icons */}
-        <nav className="flex w-full flex-1 flex-col items-center gap-1.5 py-3">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(item.href)
-            return (
-              <a
-                key={item.label}
-                href={item.href}
-                onClick={() => setMenuOpen(false)}
-                aria-label={item.label}
-                title={item.label}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${
-                  active
-                    ? 'bg-yellow-400/10 text-yellow-400'
-                    : 'text-zinc-500 hover:bg-white/[0.05] hover:text-white'
-                }`}
-              >
-                {item.icon}
-              </a>
-            )
-          })}
+          {/* Nav — centro exacto de la pantalla */}
+          <nav
+            aria-label="Navegación principal"
+            className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1"
+          >
+            {NAV_ITEMS.map((item) =>
+              iconLink(item.href, item.label, item.icon, isActivePage(item.href), 'h-12 w-12'),
+            )}
+            {isAdmin &&
+              iconLink(
+                '/admin',
+                'ADMIN',
+                ADMIN_ICON,
+                pathname.startsWith('/admin'),
+                'h-12 w-12',
+                'active:bg-white/[0.06] active:text-yellow-400',
+              )}
+          </nav>
 
-          {isAdmin && (
-            <a
-              href="/admin"
-              onClick={() => setMenuOpen(false)}
-              aria-label="ADMIN"
-              title="ADMIN"
-              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${
-                pathname.startsWith('/admin')
-                  ? 'bg-yellow-400/10 text-yellow-400'
-                  : 'text-zinc-500 hover:bg-white/[0.05] hover:text-yellow-400'
-              }`}
-            >
-              {adminIcon}
-            </a>
-          )}
-        </nav>
-
-        {/* Expandir drawer */}
-        <button
-          onClick={() => setMenuOpen(true)}
-          aria-label="Abrir menú completo"
-          title="Menú completo"
-          type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-zinc-300 transition-colors active:bg-white/[0.10]"
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-          </svg>
-        </button>
-
-        {/* Usuario */}
-        <div className="safe-area-bottom shrink-0 py-3">
-          {user ? (
-            <Link
-              href="/perfil"
-              onClick={() => setMenuOpen(false)}
-              aria-label="Mi perfil"
-              title="Mi perfil"
-              className="block"
-            >
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 text-sm font-black text-black">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  user.email?.charAt(0).toUpperCase() || '?'
-                )}
-              </div>
-            </Link>
-          ) : (
-            <a
-              href="/login"
-              aria-label="Iniciar sesión"
-              title="Iniciar sesión"
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-yellow-400"
-            >
-              <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-              </svg>
-            </a>
-          )}
-        </div>
-      </aside>
-
-      {/* ─── Mobile drawer expandido (se apoya en la mini bar) ─── */}
-      {menuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-y-0 left-14 right-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setMenuOpen(false)}
-            aria-hidden="true"
-          />
-          <div className="absolute inset-y-0 left-14 flex w-64 max-w-[calc(85vw-3.5rem)] flex-col border-l border-white/[0.08] bg-[#0d0d0d] shadow-2xl">
-            {panelContent}
+          {/* Cuenta — derecha */}
+          <div className="absolute right-6 top-1/2 flex -translate-y-1/2 items-center">
+            {accountSlot}
           </div>
         </div>
-      )}
+      </header>
+
+      {/* ─── Mobile bottom nav (solo iconos, siempre visible <lg) ─── */}
+      <nav
+        aria-label="Navegación móvil"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#0d0d0d]/95 backdrop-blur-xl lg:hidden"
+      >
+        <div className="safe-area-bottom flex items-center px-1 py-1.5">
+          {NAV_ITEMS.map((item) =>
+            iconLink(item.href, item.label, item.icon, isActivePage(item.href), 'min-h-14 flex-1'),
+          )}
+
+          {isAdmin &&
+            iconLink(
+              '/admin',
+              'ADMIN',
+              ADMIN_ICON,
+              pathname.startsWith('/admin'),
+              'min-h-14 w-14',
+              'active:bg-white/[0.06] active:text-yellow-400',
+            )}
+
+          {/* Cuenta: avatar (sesión) o acceso a login (invitado) */}
+          <div className="relative flex min-h-14 w-14 shrink-0 items-center justify-center border-l border-white/[0.06]">
+            {accountSlot}
+          </div>
+        </div>
+      </nav>
     </>
   )
 }

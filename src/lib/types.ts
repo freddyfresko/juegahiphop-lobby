@@ -197,8 +197,52 @@ export interface Banner {
   accent_color: string
   sort_order: number
   active: boolean
+  start_at: string | null
+  end_at: string | null
   created_at: string
   updated_at: string
+}
+
+// ─── Admin Users (sección jugadores) ───
+
+export interface AdminUserRow {
+  id: string
+  email: string
+  registered_at: string
+  last_sign_in_at: string | null
+  display_name: string | null
+  avatar_url: string | null
+  xp: number
+  level: number
+  total_games_completed: number
+  current_streak: number
+  last_played_date: string | null
+  plays_count: number
+  completions: number
+  playtime_seconds: number
+  last_session_at: string | null
+}
+
+export interface AdminUsersSummary {
+  total_users: number
+  new_users_7d: number
+  new_users_30d: number
+  users_with_plays: number
+  users_no_plays: number
+  total_plays: number
+  completed_plays: number
+  active_today: number
+  active_7d: number
+  active_30d: number
+  trial_plays: number
+  trial_plays_today: number
+  trial_plays_7d: number
+}
+
+export interface TrialStats {
+  totals: { plays: number; unique_sessions: number }
+  by_day: { day: string; plays: number }[]
+  by_game: { game_id: string; plays: number }[]
 }
 
 // ─── Campaign Types ───

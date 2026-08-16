@@ -207,6 +207,8 @@ export interface BannerInput {
   accent_color?: string
   sort_order?: number
   active?: boolean
+  start_at?: string | null
+  end_at?: string | null
 }
 
 /**
@@ -228,6 +230,8 @@ export async function createBanner(data: BannerInput) {
     accent_color: data.accent_color || '#facc15',
     sort_order: data.sort_order ?? 0,
     active: data.active ?? true,
+    start_at: data.start_at || null,
+    end_at: data.end_at || null,
   })
 
   if (error) throw new Error(`Error al crear banner: ${error.message}`)

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 import { createGameClient } from '@/lib/sdk/game-container'
 import type { GameCatalogEntry } from '@/lib/types'
 import type {
@@ -63,6 +64,18 @@ export default function GameContainer({
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+
+  // Gate de invitados: 1 partida de prueba por navegador, luego crear cuenta.
+  // Se evalúa en el inicializador (sin flash) — si ya usó su prueba,
+  // ni siquiera se monta el iframe.
+  const [trialBlocked, setTrialBlocked] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || userId) return false
+    try {
+      return window.localStorage.getItem('jh_trial_used') === '1'
+    } catch {
+      return false
+    }
+  })
 
   // ─── Ad Overlay state ───
   const [activeAd, setActiveAd] = useState<{
@@ -435,6 +448,21 @@ export default function GameContainer({
 
         // 2f. ¡Juego activo!
         setState('playing')
+
+        // Invitado: consumir la partida de prueba (1 sola por navegador).
+        // Se marca recién acá (el juego realmente arrancó) para no gastar
+        // la prueba en un juego que no cargó.
+        if (!userId) {
+          try {
+            window.localStorage.setItem('jh_trial_used', '1')
+          } catch {
+            // localStorage bloqueado → el gate no aplica, sigue de invitado
+          }
+          void supabase
+            .from('trial_plays')
+            .insert({ session_id: getSessionId(), game_id: slug })
+            .then(() => {}, () => { /* no crítico */ })
+        }
       } catch (err) {
         if (destroyed) return
         setErrorMsg((err as Error).message)
@@ -865,6 +893,33 @@ export default function GameContainer({
 
       {/* ─── Game area ─── */}
       <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
+        {trialBlocked ? (
+          /* ─── Gate invitado: prueba usada → crear cuenta ─── */
+          <div className="relative z-10 flex flex-col items-center px-4 text-center">
+            <div className="mb-4 text-5xl">🎮</div>
+            <h2 className="font-archivo text-xl tracking-wide text-white sm:text-2xl">
+              ¡YA PROBASTE <span className="text-yellow-400">UN JUEGO</span>!
+            </h2>
+            <p className="mt-2 max-w-sm text-xs uppercase tracking-wider text-zinc-500">
+              Crea tu cuenta gratis para seguir jugando, guardar tu progreso y sumar XP y logros.
+            </p>
+            <div className="mt-6 flex w-full max-w-xs flex-col gap-3">
+              <a
+                href="/login"
+                className="flex min-h-12 items-center justify-center rounded-xl bg-yellow-400 px-6 text-sm font-bold text-black transition-colors hover:bg-yellow-300"
+              >
+                INICIAR SESIÓN
+              </a>
+              <a
+                href="/login?view=register"
+                className="flex min-h-12 items-center justify-center rounded-xl border border-yellow-400/30 bg-yellow-400/10 px-6 text-sm font-bold text-yellow-400 transition-colors hover:bg-yellow-400/20"
+              >
+                CREAR CUENTA GRATIS
+              </a>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Loading / Handshake state */}
         {(state === 'loading' || state === 'handshake') && (
           <LoadingScreen
@@ -937,6 +992,8 @@ export default function GameContainer({
             onError={handleIframeError}
             loading="lazy"
           />
+        )}
+          </>
         )}
       </div>
 

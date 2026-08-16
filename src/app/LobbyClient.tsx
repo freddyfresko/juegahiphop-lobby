@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import GameCard from '@/components/GameCard'
 import Logo from '@/components/Logo'
 import Link from 'next/link'
+import { getActiveBanners } from '@/lib/banner-utils'
 import type { PlayerProfile, GameCatalogEntry, GameProgress, Banner } from '@/lib/types'
 import type { User } from '@supabase/supabase-js'
 
@@ -64,6 +65,8 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [activeCategory, setActiveCategory] = useState<string>('todos')
+  const [bannerIndex, setBannerIndex] = useState(0)
+  const [bannerPaused, setBannerPaused] = useState(false)
 
   useEffect(() => {
     if (initialGames.length > 0) {
@@ -97,7 +100,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
         setDebug(gamesRes.error ? `error: ${gamesRes.error.message}` : `ok: ${gamesRes.data?.length ?? 0} juegos`)
         if (!gamesRes.error) {
           setGames((gamesRes.data ?? []) as GameCatalogEntry[])
-          setBanners((bannersRes.data ?? []) as Banner[])
+          setBanners(getActiveBanners((bannersRes.data ?? []) as Banner[]))
         }
       } catch (e) {
         clearTimeout(timeoutId)
@@ -190,8 +193,24 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
     ? gridGames
     : gridGames.filter((g) => g.category === activeCategory)
 
-  // Banner activo (primero de la lista)
-  const heroBanner = banners.length > 0 ? banners[0] : null
+  // Banners VIGENTES ordenados por prioridad (carrusel del hero)
+  const activeBanners = useMemo(() => getActiveBanners(banners), [banners])
+
+  // Rotación automática cada 6s entre los vigentes (1 solo → queda fijo).
+  // Se pausa con el mouse encima para poder leer el banner.
+  // (El índice siempre va con % activeBanners.length, así queda en rango
+  // aunque cambie la lista: banner vencido, nuevo banner, reorden, etc.)
+  useEffect(() => {
+    if (activeBanners.length <= 1 || bannerPaused) return
+    const id = setInterval(() => {
+      setBannerIndex((i) => (i + 1) % activeBanners.length)
+    }, 6000)
+    return () => clearInterval(id)
+  }, [activeBanners.length, bannerPaused])
+
+  // Banner activo del carrusel
+  const heroBanner =
+    activeBanners.length > 0 ? activeBanners[bannerIndex % activeBanners.length] : null
 
   return (
     <div className="vignette brick-bg graffiti-spray min-h-dvh">
@@ -199,10 +218,14 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
 
       <div className="relative z-10 flex min-h-dvh flex-col content-with-rail">
         {/* ─── HERO COMPACTO ─── */}
-        <section className="relative flex min-h-[300px] items-end overflow-hidden border-b border-white/[0.04] sm:min-h-[360px]">
+        <section
+          className="relative flex min-h-[300px] items-end overflow-hidden border-b border-white/[0.04] sm:min-h-[360px]"
+          onMouseEnter={() => setBannerPaused(true)}
+          onMouseLeave={() => setBannerPaused(false)}
+        >
           {heroBanner?.image_url && (
             <>
-              <div className="absolute inset-0">
+              <div key={heroBanner.id} className="absolute inset-0 animate-fade-in">
                 <img
                   src={`${heroBanner.image_url}?v=${new Date(heroBanner.updated_at).getTime()}`}
                   alt=""
@@ -210,7 +233,8 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                 />
               </div>
               <div
-                className="absolute inset-0"
+                key={`overlay-${heroBanner.id}`}
+                className="absolute inset-0 animate-fade-in"
                 style={{
                   background: `linear-gradient(180deg, rgba(0,0,0,${heroBanner.overlay_opacity}) 0%, rgba(0,0,0,${Number(heroBanner.overlay_opacity) + 0.3}) 100%)`,
                 }}
@@ -229,7 +253,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
           )}
 
           <div className="relative z-10 w-full px-4 pb-8 sm:px-6 sm:pb-10 lg:px-8">
-            <div className="animate-fade-in-up mx-auto max-w-6xl">
+            <div key={heroBanner?.id ?? 'no-banner'} className="animate-fade-in-up mx-auto max-w-6xl">
               <div className="mb-3 flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center">
                   <Logo size="sm" priority />
@@ -280,6 +304,25 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
               )}
             </div>
           </div>
+
+          {/* ─── Dots del carrusel (solo si hay más de 1 vigente) ─── */}
+          {activeBanners.length > 1 && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex items-center justify-center gap-2">
+              {activeBanners.map((b, i) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => setBannerIndex(i)}
+                  aria-label={`Ver banner ${i + 1}`}
+                  className={`pointer-events-auto h-1.5 rounded-full transition-all duration-300 ${
+                    i === bannerIndex % activeBanners.length
+                      ? 'w-6 bg-yellow-400'
+                      : 'w-1.5 bg-white/40 hover:bg-white/70'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ─── CONTENIDO PRINCIPAL ─── */}

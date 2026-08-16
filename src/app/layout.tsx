@@ -70,11 +70,14 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        {/* Reglas críticas del rail lateral inline (inmunes a caché de CSS): el contenido
-            siempre corre al lado de la barra fija, en cualquier viewport. */}
+        {/* Reglas críticas del layout inline (inmunes a caché de CSS): en desktop el
+            contenido corre bajo la top nav fija (h-16); en móvil deja espacio abajo
+            para la bottom nav bar fija (h-16 + safe-area). */}
         <style>{`
-          .content-with-rail { padding-left: 3.5rem; }
-          @media (min-width: 64rem) { .content-with-rail { padding-left: 16rem; } }
+          .content-with-rail { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+          @media (min-width: 64rem) {
+            .content-with-rail { padding-top: 4rem; padding-bottom: 0; }
+          }
         `}</style>
         {children}
       </body>

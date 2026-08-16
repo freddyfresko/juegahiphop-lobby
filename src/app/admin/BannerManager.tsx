@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBanner, updateBanner, toggleBanner, deleteBanner, reorderBanners } from '@/lib/admin-actions'
 import ImageUpload from './ImageUpload'
+import { toLocalInputValue, formatScheduleRange } from '@/lib/banner-utils'
 import type { Banner } from '@/lib/types'
 
 interface BannerManagerProps {
@@ -24,6 +25,8 @@ function BannerForm({ banner, onDone, showMsg }: {
   const [linkUrl, setLinkUrl] = useState(banner?.link_url || '')
   const [linkLabel, setLinkLabel] = useState(banner?.link_label || 'JUGAR AHORA')
   const [imageUrl, setImageUrl] = useState(banner?.image_url || '')
+  const [startAt, setStartAt] = useState(banner?.start_at ? toLocalInputValue(banner.start_at) : '')
+  const [endAt, setEndAt] = useState(banner?.end_at ? toLocalInputValue(banner.end_at) : '')
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
@@ -36,6 +39,8 @@ function BannerForm({ banner, onDone, showMsg }: {
         image_url: imageUrl || null,
         link_url: linkUrl || null,
         link_label: linkLabel,
+        start_at: startAt ? new Date(startAt).toISOString() : null,
+        end_at: endAt ? new Date(endAt).toISOString() : null,
       }
       if (banner) {
         await updateBanner(banner.id, data)
@@ -79,6 +84,21 @@ function BannerForm({ banner, onDone, showMsg }: {
             className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-yellow-500/40" />
         </div>
       </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Vigencia desde (opcional)</label>
+          <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)}
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-yellow-500/40 [color-scheme:dark]" />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Vigencia hasta (opcional)</label>
+          <input type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)}
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-yellow-500/40 [color-scheme:dark]" />
+        </div>
+      </div>
+      <p className="text-[10px] text-zinc-600">
+        ⏰ Vacíos = siempre vigente. El home rota automáticamente los banners vigentes (cada 6s).
+      </p>
       <ImageUpload
         currentUrl={banner?.image_url || null}
         gameSlug={`banner-${banner?.id || 'new'}`}
@@ -214,6 +234,11 @@ export default function BannerManager({ banners }: BannerManagerProps) {
                   <span className="rounded-full bg-black/40 px-2.5 py-0.5 text-[9px] text-zinc-400 backdrop-blur-sm">
                     #{banner.sort_order}
                   </span>
+                  {formatScheduleRange(banner.start_at, banner.end_at) && (
+                    <span className="rounded-full bg-black/40 px-2.5 py-0.5 text-[9px] text-zinc-400 backdrop-blur-sm">
+                      📅 {formatScheduleRange(banner.start_at, banner.end_at)}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1.5 border-t border-white/[0.04] bg-white/[0.02] px-3 py-2">

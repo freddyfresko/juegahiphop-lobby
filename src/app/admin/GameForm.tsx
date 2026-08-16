@@ -46,22 +46,7 @@ export default function GameForm({ game }: GameFormProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
-      {/* Header */}
-      <header className="border-b border-white/[0.06] bg-black/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:px-6">
-          <Link href="/admin" className="flex items-center gap-2">
-            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M2 19l2-12 4 3 4-5 4 5 4-3 2 12H2zM12 5l-3 4 3-1 3 1-3-4z"/>
-            </svg>
-            <span className="font-archivo text-lg tracking-wide text-white">
-              {isEditing ? 'EDITAR' : 'NUEVO'} <span className="text-yellow-400">JUEGO</span>
-            </span>
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <form action={handleSubmit} className="space-y-6">
           {/* Error */}
           {error && (
@@ -296,8 +281,7 @@ export default function GameForm({ game }: GameFormProps) {
             </Link>
           </div>
         </form>
-      </main>
-    </div>
+    </main>
   )
 }
 

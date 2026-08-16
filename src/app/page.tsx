@@ -2,6 +2,7 @@ import LobbyClient from './LobbyClient'
 import { createClient } from '@/lib/supabase/server'
 import type { GameCatalogEntry, Banner } from '@/lib/types'
 import { PUBLIC_GAME_CATALOG } from '@/lib/public-game-catalog'
+import { getActiveBanners } from '@/lib/banner-utils'
 import { SITE_URL } from '@/lib/seo'
 
 /**
@@ -31,6 +32,9 @@ export default async function HomePage() {
     .eq('active', true)
     .order('sort_order', { ascending: true })
 
+  // Solo los VIGENTES hoy (start_at/end_at) — el resto no se manda al cliente
+  const activeBanners = getActiveBanners((banners ?? []) as Banner[])
+
   // Structured data: ItemList de juegos (schema.org)
   const gamesJsonLd = {
     '@context': 'https://schema.org',
@@ -56,7 +60,7 @@ export default async function HomePage() {
       />
       <LobbyClient
         initialGames={publicGames.length > 0 ? publicGames : PUBLIC_GAME_CATALOG}
-        initialBanners={(banners ?? []) as Banner[]}
+        initialBanners={activeBanners}
       />
     </>
   )
