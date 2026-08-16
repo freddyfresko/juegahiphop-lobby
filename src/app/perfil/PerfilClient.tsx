@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
+import AvatarUpload from '@/components/AvatarUpload'
 import { useIsAdmin } from '@/lib/use-is-admin'
 import type { PlayerProfile, AchievementUnlock, AchievementDefinition, GameCatalogEntry } from '@/lib/types'
 import type { User } from '@supabase/supabase-js'
@@ -252,14 +253,28 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
         <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
           <div className="animate-fade-in-up">
             {/* Page header */}
-            <div className="mb-8 flex items-start justify-between">
-              <div>
-                <h1 className="font-archivo text-3xl tracking-wide text-white sm:text-4xl">
-                  MI <span className="text-yellow-400">PERFIL</span>
-                </h1>
-                <p className="mt-1 text-xs uppercase tracking-wider text-zinc-500">
-                  {user?.email}
-                </p>
+            <div className="mb-8 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-4 sm:gap-5">
+                <AvatarUpload
+                  userId={userId}
+                  currentUrl={profile?.avatar_url ?? null}
+                  onChanged={(url) =>
+                    setProfile((p) =>
+                      p ? { ...p, avatar_url: url } as PlayerProfile : p,
+                    )
+                  }
+                />
+                <div>
+                  <h1 className="font-archivo text-3xl tracking-wide text-white sm:text-4xl">
+                    MI <span className="text-yellow-400">PERFIL</span>
+                  </h1>
+                  <p className="mt-1 text-xs uppercase tracking-wider text-zinc-500">
+                    {user?.email}
+                  </p>
+                  <p className="mt-1 text-[10px] uppercase tracking-wider text-zinc-600">
+                    NIVEL {nivelFinal} · {xpFinal.toLocaleString()} XP
+                  </p>
+                </div>
               </div>
               <button
                 onClick={handleSignOut}
@@ -487,7 +502,7 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
         </main>
 
         <footer className="border-t border-white/[0.06] py-6 text-center text-[10px] uppercase tracking-wider text-zinc-700">
-          © 2026 Juega Hip Hop
+          © 2026 Juega Hip Hop · Un proyecto de Infinity Force Company
         </footer>
       </div>
     </div>

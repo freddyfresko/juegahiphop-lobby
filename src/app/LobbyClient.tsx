@@ -506,7 +506,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
               </div>
             </div>
             <div className="mt-6 border-t border-white/[0.04] pt-4 text-center text-[9px] uppercase tracking-wider text-zinc-800">
-              © 2026 Juega Hip Hop — La cultura es tu mejor arma
+              © 2026 Juega Hip Hop — La cultura es tu mejor arma · Un proyecto de Infinity Force Company
               {debug && <span className="ml-2">[{debug}]</span>}
             </div>
           </div>

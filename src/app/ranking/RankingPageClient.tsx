@@ -39,7 +39,7 @@ export default function RankingPageClient({ games }: { games: GameCatalogEntry[]
         </main>
 
         <footer className="border-t border-white/[0.06] py-6 text-center text-[10px] uppercase tracking-wider text-zinc-700">
-          © 2026 Juega Hip Hop
+          © 2026 Juega Hip Hop · Un proyecto de Infinity Force Company
         </footer>
       </div>
     </div>
