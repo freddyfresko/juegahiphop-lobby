@@ -5,6 +5,7 @@ import type { SelectedCampaign } from '@/lib/campaign-manager'
 import type { CampaignPlacement } from '@/lib/types'
 import { loadAdinPlay, showAdinPlayAd, isAdinPlayConfigured } from '@/lib/adinplay-loader'
 import { loadAdSense, showAdSenseAd, isAdSenseConfigured } from '@/lib/adsense-loader'
+import AdsterraBanner, { type AdsterraFormat } from '@/components/AdsterraBanner'
 
 // ─── Props ───
 
@@ -63,6 +64,7 @@ export default function AdOverlay({
     campaign.provider === 'google_ads' &&
     isAdSenseConfigured() &&
     Boolean(campaign.config?.ad_slot)
+  const isAdsterraAd = campaign.provider === 'adsterra'
   const isNetworkAd = isAdinPlayAd || isAdSenseAd
   const [networkAdMounted, setNetworkAdMounted] = useState(false)
   const adContainerRef = useRef<HTMLDivElement | null>(null)
@@ -182,14 +184,21 @@ export default function AdOverlay({
       aria-label="Publicidad"
     >
       <div className="relative mx-4 w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0f0f0f] shadow-2xl">
-        {/* ─── Ad de red real (AdinPlay) — el SDK inyecta aquí ─── */}
-        {networkAdMounted ? (
+        {/* ─── Ad de red real (AdinPlay / AdSense / Adsterra) — el SDK inyecta aquí ─── */}
+        {networkAdMounted || isAdsterraAd ? (
           <div
             ref={adContainerRef}
             className="flex min-h-[300px] w-full items-center justify-center"
             aria-label="Publicidad"
           >
-            {/* El SDK de AdinPlay monta su ad en este contenedor */}
+            {isAdsterraAd ? (
+              <AdsterraBanner
+                format={(campaign.config?.ad_format as AdsterraFormat) ?? '300x250'}
+              />
+            ) : (
+              /* El SDK de AdinPlay/AdSense monta su ad en este contenedor */
+              <></>
+            )}
           </div>
         ) : (
           <>
@@ -309,8 +318,9 @@ export default function AdOverlay({
             {campaign.provider === 'direct_sponsor' && 'Patrocinador'}
             {campaign.provider === 'adinplay' && 'AdinPlay'}
             {campaign.provider === 'nitropay' && 'NitroPay'}
+            {campaign.provider === 'adsterra' && 'Adsterra'}
             {campaign.provider === 'internal' && 'JuegaHipHop'}
-            {!['google_ads','direct_sponsor','adinplay','nitropay','internal'].includes(campaign.provider) && campaign.provider}
+            {!['google_ads','direct_sponsor','adinplay','nitropay','adsterra','internal'].includes(campaign.provider) && campaign.provider}
           </p>
         </div>
           </>

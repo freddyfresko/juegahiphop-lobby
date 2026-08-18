@@ -37,6 +37,7 @@ const TYPE_OPTIONS: { value: CampaignType; label: string }[] = [
 
 const PROVIDER_OPTIONS: { value: CampaignProvider; label: string }[] = [
   { value: 'google_ads', label: 'Google AdSense' },
+  { value: 'adsterra', label: 'Adsterra' },
   { value: 'adinplay', label: 'AdinPlay' },
   { value: 'nitropay', label: 'NitroPay' },
   { value: 'direct_sponsor', label: 'Sponsor directo' },
@@ -109,6 +110,9 @@ function CampaignForm({
   const [adSlot, setAdSlot] = useState<string>(
     (campaign?.config?.ad_slot as string) ?? '',
   )
+  const [adFormat, setAdFormat] = useState<'300x250' | '728x90' | 'native'>(
+    (campaign?.config?.ad_format as '300x250' | '728x90' | 'native') ?? '300x250',
+  )
   const [rewardValue, setRewardValue] = useState<string>(
     campaign?.reward?.value?.toString() ?? '',
   )
@@ -163,6 +167,7 @@ function CampaignForm({
         config: {
           ...(campaign?.config ?? {}),
           ...(provider === 'google_ads' && adSlot ? { ad_slot: adSlot } : {}),
+          ...(provider === 'adsterra' ? { ad_format: adFormat } : {}),
         },
       }
       if (campaign) {
@@ -261,6 +266,28 @@ function CampaignForm({
           <p className="mt-1 text-[10px] text-zinc-600">
             Cuando la cuenta esté aprobada: crea una unidad «Display» en AdSense y pega su ID acá.
             El ad real se mostrará en el overlay en vez del contenido manual.
+          </p>
+        </div>
+      )}
+
+      {/* ─── Formato (Adsterra) ─── */}
+      {provider === 'adsterra' && (
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            Formato de Adsterra
+          </label>
+          <select
+            value={adFormat}
+            onChange={(e) => setAdFormat(e.target.value as '300x250' | '728x90' | 'native')}
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-yellow-500/40"
+          >
+            <option value="300x250" className="bg-zinc-900">300×250 (rectángulo — ideal overlay)</option>
+            <option value="728x90" className="bg-zinc-900">728×90 (leaderboard desktop)</option>
+            <option value="native" className="bg-zinc-900">Native banner</option>
+          </select>
+          <p className="mt-1 text-[10px] text-zinc-600">
+            El ad real de Adsterra se muestra en el overlay (o en el slot elegido) con la cuenta
+            juegahiphop.cl ya activa.
           </p>
         </div>
       )}

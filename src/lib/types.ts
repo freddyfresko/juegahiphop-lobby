@@ -290,6 +290,7 @@ export type CampaignProvider =
   | 'google_ads'
   | 'adinplay'
   | 'nitropay'
+  | 'adsterra'
   | 'mobile_ads'
   | 'future'
 
