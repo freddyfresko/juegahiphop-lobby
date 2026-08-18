@@ -65,6 +65,9 @@ export default function GameContainer({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
+  // Ad de carga: se muestra UNA vez por apertura del juego
+  const loadingAdShownRef = useRef(false)
+
   // ─── Ad Overlay state ───
   const [activeAd, setActiveAd] = useState<{
     campaign: SelectedCampaign
@@ -436,6 +439,43 @@ export default function GameContainer({
 
         // 2f. ¡Juego activo!
         setState('playing')
+
+        // 2g. Ad de carga: UNA vez por apertura (placement game_loading).
+        // El juego no lo pidió (el lobby lo dispara al abrir). Si hay una
+        // campaña elegible, el overlay aparece apenas arranca el juego y
+        // el usuario la cierra para jugar. Sin campaña → no pasa nada.
+        if (!loadingAdShownRef.current) {
+          loadingAdShownRef.current = true
+          try {
+            const loadingCampaign = await selectCampaign(
+              supabase,
+              'game_loading',
+              slug,
+              userId,
+            )
+            if (loadingCampaign && !destroyed) {
+              const viewId = newViewId()
+              await trackImpression(supabase, loadingCampaign.id, 'shown', {
+                userId,
+                gameId: slug,
+                placement: 'game_loading',
+                sessionId: getSessionId(),
+                viewId,
+              })
+              // requestId sintético: el juego no espera respuesta por este ad
+              setActiveAd({
+                campaign: loadingCampaign,
+                placement: 'game_loading',
+                requestId: `lobby-loading-${Date.now()}`,
+                rewardIds: [],
+                viewId,
+                shownAt: Date.now(),
+              })
+            }
+          } catch {
+            // Nunca bloquear la entrada al juego por un ad
+          }
+        }
       } catch (err) {
         if (destroyed) return
         setErrorMsg((err as Error).message)

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
+import AdsterraBanner from '@/components/AdsterraBanner'
 import { useIsAdmin } from '@/lib/use-is-admin'
 import Ranking from '@/components/Ranking'
 import type { GameCatalogEntry } from '@/lib/types'
@@ -32,6 +33,11 @@ export default function RankingPageClient({ games }: { games: GameCatalogEntry[]
               <p className="mt-1 text-xs uppercase tracking-wider text-zinc-500">
                 La competencia está servida. ¿Dónde quedas tú?
               </p>
+            </div>
+
+            {/* Banner Adsterra 300x250 */}
+            <div className="mb-8 flex justify-center">
+              <AdsterraBanner format="300x250" />
             </div>
 
             <Ranking user={user} games={games} />
