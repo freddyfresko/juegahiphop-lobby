@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { SelectedCampaign } from '@/lib/campaign-manager'
 import type { CampaignPlacement } from '@/lib/types'
 import { loadAdinPlay, showAdinPlayAd, isAdinPlayConfigured } from '@/lib/adinplay-loader'
+import { loadAdSense, showAdSenseAd, isAdSenseConfigured } from '@/lib/adsense-loader'
 
 // ─── Props ───
 
@@ -53,34 +54,48 @@ export default function AdOverlay({
   const REWARDED_SECONDS = 5
   const trackRef = useRef(false)
 
-  // ─── Ad de red real (AdinPlay) ───
-  // Si la campaña es de AdinPlay y el SDK está configurado, intentamos
+  // ─── Ad de red real (AdinPlay / AdSense) ───
+  // Si la campaña es de una red real y el SDK está configurado, intentamos
   // mostrar el ad real de la red en el contenedor dedicado. Sin SDK
   // configurado (o si falla), el overlay cae al contenido manual.
-  const isNetworkAd = campaign.provider === 'adinplay' && isAdinPlayConfigured()
+  const isAdinPlayAd = campaign.provider === 'adinplay' && isAdinPlayConfigured()
+  const isAdSenseAd =
+    campaign.provider === 'google_ads' &&
+    isAdSenseConfigured() &&
+    Boolean(campaign.config?.ad_slot)
+  const isNetworkAd = isAdinPlayAd || isAdSenseAd
   const [networkAdMounted, setNetworkAdMounted] = useState(false)
   const adContainerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!isNetworkAd) return
     let cancelled = false
-    loadAdinPlay().then(async (ok) => {
-      if (cancelled || !ok) return
-      // Mostrar el ad real (interstitial o rewarded según placement)
-      const kind: 'interstitial' | 'rewarded' = isRewarded ? 'rewarded' : 'interstitial'
-      const shown = await showAdinPlayAd(kind)
+
+    const run = async () => {
+      let shown = false
+      if (isAdSenseAd) {
+        const adSlot = campaign.config?.ad_slot as string
+        // El SDK de AdSense monta la unidad display en el contenedor.
+        shown = await showAdSenseAd(adContainerRef.current, adSlot)
+      } else {
+        // Mostrar el ad real AdinPlay (interstitial o rewarded según placement)
+        const kind: 'interstitial' | 'rewarded' = isRewarded ? 'rewarded' : 'interstitial'
+        shown = await showAdinPlayAd(kind)
+      }
       if (cancelled) return
       if (shown) {
         setNetworkAdMounted(true)
-        // El SDK de la red gestiona su propio cierre/recompensa.
+        // AdinPlay: el SDK de la red gestiona su propio cierre/recompensa.
         // TODO(adinplay): conectar onClose/onReward del SDK real para
         // llamar handleComplete('reward_granted' | 'dismissed') aquí.
       }
-    })
+    }
+
+    run()
     return () => {
       cancelled = true
     }
-  }, [isNetworkAd, isRewarded])
+  }, [isNetworkAd, isAdSenseAd, isRewarded, campaign.config?.ad_slot])
 
   // Inicialización directa: interstitial permite cerrar de inmediato,
   // rewarded arranca con countdown y canClose=false

@@ -106,6 +106,9 @@ function CampaignForm({
     campaign?.max_per_user?.toString() ?? '0',
   )
   const [status, setStatus] = useState<CampaignEntry['status']>(campaign?.status ?? 'draft')
+  const [adSlot, setAdSlot] = useState<string>(
+    (campaign?.config?.ad_slot as string) ?? '',
+  )
   const [rewardValue, setRewardValue] = useState<string>(
     campaign?.reward?.value?.toString() ?? '',
   )
@@ -157,6 +160,10 @@ function CampaignForm({
               description: rewardDesc,
             }
           : null,
+        config: {
+          ...(campaign?.config ?? {}),
+          ...(provider === 'google_ads' && adSlot ? { ad_slot: adSlot } : {}),
+        },
       }
       if (campaign) {
         await updateCampaign(campaign.id, data)
@@ -238,6 +245,25 @@ function CampaignForm({
           </select>
         </div>
       </div>
+
+      {/* ─── Ad slot (AdSense) ─── */}
+      {provider === 'google_ads' && (
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            Ad slot de AdSense (data-ad-slot)
+          </label>
+          <input
+            value={adSlot}
+            onChange={(e) => setAdSlot(e.target.value)}
+            placeholder="Ej: 1234567890 — se crea en tu panel de AdSense → Ads → Unidad de anuncio"
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-yellow-500/40"
+          />
+          <p className="mt-1 text-[10px] text-zinc-600">
+            Cuando la cuenta esté aprobada: crea una unidad «Display» en AdSense y pega su ID acá.
+            El ad real se mostrará en el overlay en vez del contenido manual.
+          </p>
+        </div>
+      )}
 
       {/* ─── Placements (multi) ─── */}
       <div>
