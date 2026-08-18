@@ -214,7 +214,7 @@ export default function CampaignAnalytics() {
               {series.map((s) => (
                 <div
                   key={s.day}
-                  className="group relative flex flex-1 flex-col justify-end gap-[2px]"
+                  className="group relative flex h-full flex-1 flex-col justify-end gap-[2px]"
                   title={`${s.day} — ${fmt(s.impressions)} impr · ${fmt(s.clicks)} clicks · ${fmtCtr(s.ctr)}`}
                 >
                   {/* Clicks bar */}
