@@ -184,25 +184,7 @@ export default function AdOverlay({
       aria-label="Publicidad"
     >
       <div className="relative mx-4 w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0f0f0f] shadow-2xl">
-        {/* ─── Ad de red real (AdinPlay / AdSense / Adsterra) — el SDK inyecta aquí ─── */}
-        {networkAdMounted || isAdsterraAd ? (
-          <div
-            ref={adContainerRef}
-            className="flex min-h-[300px] w-full items-center justify-center"
-            aria-label="Publicidad"
-          >
-            {isAdsterraAd ? (
-              <AdsterraBanner
-                format={(campaign.config?.ad_format as AdsterraFormat) ?? '300x250'}
-              />
-            ) : (
-              /* El SDK de AdinPlay/AdSense monta su ad en este contenedor */
-              <></>
-            )}
-          </div>
-        ) : (
-          <>
-        {/* ─── Ad badge ─── */}
+        {/* ─── Ad badge + botón cerrar (SIEMPRE visibles: contenido manual y ad de red) ─── */}
         <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
           <span className="rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400 backdrop-blur-sm">
             Ad
@@ -228,6 +210,24 @@ export default function AdOverlay({
           )}
         </div>
 
+        {/* ─── Ad de red real (AdinPlay / AdSense / Adsterra) — el SDK inyecta aquí ─── */}
+        {networkAdMounted || isAdsterraAd ? (
+          <div
+            ref={adContainerRef}
+            className="flex min-h-[300px] w-full items-center justify-center"
+            aria-label="Publicidad"
+          >
+            {isAdsterraAd ? (
+              <AdsterraBanner
+                format={(campaign.config?.ad_format as AdsterraFormat) ?? '300x250'}
+              />
+            ) : (
+              /* El SDK de AdinPlay/AdSense monta su ad en este contenedor */
+              <></>
+            )}
+          </div>
+        ) : (
+          <>
         {/* ─── Media (imagen o placeholder) ─── */}
         <div className="relative aspect-video w-full overflow-hidden bg-gradient-to-br from-zinc-900 to-zinc-800">
           {campaign.image_url ? (
