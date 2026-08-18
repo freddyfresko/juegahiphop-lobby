@@ -19,6 +19,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   ...baseMetadata,
+  // Verificación de Google AdSense (meta google-adsense-account)
+  other: {
+    'google-adsense-account': 'ca-pub-9249421160144086',
+  },
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
