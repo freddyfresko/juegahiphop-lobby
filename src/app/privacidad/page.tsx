@@ -122,6 +122,7 @@ export default function PrivacyPage() {
               La plataforma se financia con publicidad. Trabajamos (o podemos
               trabajar) con proveedores de publicidad como{' '}
               <strong className="text-white">Google AdSense</strong>,{' '}
+              <strong className="text-white">Adsterra</strong>,{' '}
               <strong className="text-white">AdinPlay</strong> y{' '}
               <strong className="text-white">NitroPay</strong>. Estos proveedores
               pueden:
@@ -162,6 +163,17 @@ export default function PrivacyPage() {
                   className="text-yellow-400 underline underline-offset-2 hover:text-yellow-300"
                 >
                   adinplay.com/privacy-policy
+                </a>
+              </li>
+              <li>
+                Adsterra:{' '}
+                <a
+                  href="https://adsterra.com/privacy-policy/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-yellow-400 underline underline-offset-2 hover:text-yellow-300"
+                >
+                  adsterra.com/privacy-policy
                 </a>
               </li>
               <li>
