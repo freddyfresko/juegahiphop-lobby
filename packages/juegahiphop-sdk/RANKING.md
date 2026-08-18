@@ -122,6 +122,35 @@ cuentan (no hay `ended_at`).
 
 ---
 
+## 5b. Caso especial: Trivia — el ranking por juego es del modo competición
+
+La Trivia tiene 3 modos: **Por Área**, **Mixto** (práctica, rondas de 10) y
+**Competición** (llegar lo más lejos posible sin equivocarse). El ranking
+**por juego** de la trivia (`/ranking`, pestaña por juego) se arma SOLO con
+sesiones del modo competición — la migración 00031 filtra
+`game_sessions.metadata->>'modo' = 'competencia'`.
+
+Para que una partida cuente en ese ranking, el juego manda:
+
+```ts
+lobby.sendGameCompleted({
+  score: distancia,          // preguntas seguidas sin fallar (la racha)
+  itemId: 'competencia',
+  difficulty: 'progresiva', // sube de fácil a experto cada 5 aciertos
+  completed: false,         // la racha termina al fallar → no es "completada"
+  metadata: { modo: 'competencia' },  // ← CLAVE: el lobby lo guarda en la sesión
+})
+```
+
+- `metadata.modo` es obligatorio en competición: sin él, la sesión queda
+  fuera del ranking por juego de la trivia.
+- Las partidas de práctica (área/mixto) siguen sumando XP al ranking
+  general, pero no compiten en el ranking de trivia.
+- `score` es un entero ≥ 0 (la distancia). El resto de juegos no se ve
+  afectado por el filtro.
+
+---
+
 ## 6. Checklist para adaptar un juego (ej: Puzzle)
 
 - [ ] Enviar `jh:game_started` al iniciar cada partida (con `difficulty` si existe)
