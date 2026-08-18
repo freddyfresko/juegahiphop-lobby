@@ -6,9 +6,11 @@ import type { AuthView } from '@/lib/types'
 
 interface AuthFormProps {
   initialView?: string
+  /** Ruta interna a la que volver tras autenticar (ej: /jugar/trivia) */
+  nextPath?: string
 }
 
-export default function AuthForm({ initialView }: AuthFormProps) {
+export default function AuthForm({ initialView, nextPath }: AuthFormProps) {
   const [view, setView] = useState<AuthView>(initialView === 'register' ? 'register' : 'login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -63,17 +65,20 @@ export default function AuthForm({ initialView }: AuthFormProps) {
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: nextPath
+            ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
+            : `${window.location.origin}/auth/callback`,
         },
       })
     } catch (err) {
       setError('Error al conectar con Google. Intenta de nuevo.')
       console.error('[AuthForm] Google error:', err)
     }
-  }, [])
+  }, [nextPath])
 
   return (
     <form action={view === 'login' ? '/auth/login' : undefined} method="post" onSubmit={handleSubmit} className="space-y-4">
+      {nextPath && <input type="hidden" name="next" value={nextPath} />}
       <div>
         <label htmlFor="email" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
           Correo electrónico

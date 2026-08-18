@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 }
 
 interface LoginPageProps {
-  searchParams: Promise<{ error?: string; error_description?: string; reason?: string; view?: string }>
+  searchParams: Promise<{ error?: string; error_description?: string; reason?: string; view?: string; next?: string }>
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -18,6 +18,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const errorDescription = params.error_description
   const reason = params.reason
   const initialView = params.view
+  const nextPath = params.next?.startsWith('/') && !params.next.startsWith('//') ? params.next : undefined
 
   // Mapa de errores conocidos
   const errorMessages: Record<string, { title: string; description: string }> = {
@@ -97,7 +98,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         )}
 
         {/* Form */}
-        <AuthForm initialView={initialView} />
+        <AuthForm initialView={initialView} nextPath={nextPath} />
 
         {/* Footer */}
         <p className="mt-10 text-center text-[10px] uppercase tracking-wider text-zinc-700">

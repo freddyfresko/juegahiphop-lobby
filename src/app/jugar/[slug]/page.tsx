@@ -6,6 +6,7 @@ import { validateGameUrl } from '@/lib/game-utils'
 import { getDevGameOverride } from '@/lib/dev-override'
 import { getPublicGameBySlug } from '@/lib/public-game-catalog'
 import GameContainer from '@/components/GameContainer'
+import AuthGate from '@/components/AuthGate'
 import { videoGameJsonLd, SITE_NAME } from '@/lib/seo'
 import type { GameCatalogEntry } from '@/lib/types'
 
@@ -65,7 +66,7 @@ export default async function JugarSlugPage({ params }: PageProps) {
   const { slug } = await params
   const supabase = await createClient()
 
-  // Verificar sesión (opcional — el juego funciona sin cuenta)
+  // Verificar sesión — JUGAR requiere cuenta (gate server-side)
   const { data: { user } } = await supabase.auth.getUser()
 
   // Obtener datos del juego desde Supabase (todos los status, no solo activos)
@@ -98,6 +99,13 @@ export default async function JugarSlugPage({ params }: PageProps) {
     notFound()
   }
 
+  // ─── Sin sesión → gate de cuenta (los juegos NO se juegan como invitado) ───
+  // Render server-side con la portada (SEO intacto); el CTA lleva a
+  // /login?next=... y tras autenticar vuelve directo al juego.
+  if (!user) {
+    return <AuthGate game={typedGame} slug={slug} />
+  }
+
   // ─── Dev override: reemplazar URL y origins en desarrollo ───
   const devOverride = getDevGameOverride(slug)
   const gameUrl = devOverride?.url ?? typedGame.external_url
@@ -127,7 +135,7 @@ export default async function JugarSlugPage({ params }: PageProps) {
         slug={slug}
         game={{ ...typedGame, allowed_origins: allowedOrigins }}
         validatedUrl={urlCheck.url}
-        userId={user?.id ?? null}
+        userId={user.id}
       />
     </>
   )

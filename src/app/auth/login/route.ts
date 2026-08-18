@@ -56,12 +56,18 @@ function loginRedirect(path: string, pendingCookies: PendingCookie[]) {
   }), pendingCookies)
 }
 
+function safeNext(value: string | null | undefined) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
+  return value
+}
+
 export async function POST(request: NextRequest) {
   const pendingCookies: PendingCookie[] = []
   const supabase = createAuthClient(request, pendingCookies)
   const formData = await request.formData()
   const email = String(formData.get('email') ?? '').trim()
   const password = String(formData.get('password') ?? '')
+  const next = safeNext(String(formData.get('next') ?? ''))
 
   if (!email || !password) {
     return loginRedirect('/login?error=MissingCredentials', pendingCookies)
@@ -77,5 +83,5 @@ export async function POST(request: NextRequest) {
     return loginRedirect(`/login?error=${code}&error_description=${message}`, pendingCookies)
   }
 
-  return loginRedirect('/', pendingCookies)
+  return loginRedirect(next, pendingCookies)
 }

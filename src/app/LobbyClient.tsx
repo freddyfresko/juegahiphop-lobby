@@ -430,8 +430,8 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                   </div>
 
                   {!user && (
-                    <p className="mb-4 text-[10px] uppercase tracking-wider text-zinc-600">
-                      Juega sin registro — tu progreso se guarda al crear una cuenta
+                    <p className="mb-4 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-zinc-600">
+                      <span>🔒</span> Los juegos requieren cuenta — crear una es gratis y guarda tu progreso
                     </p>
                   )}
 
