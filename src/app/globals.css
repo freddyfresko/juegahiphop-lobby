@@ -111,6 +111,15 @@ textarea {
   background: rgba(255, 193, 7, 0.3);
 }
 
+/* Ocultar scrollbar en carruseles horizontales (scroll-snap) */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ─── Selection ─── */
 ::selection {
   background: rgba(255, 193, 7, 0.25);

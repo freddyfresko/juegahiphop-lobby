@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import GameCard from '@/components/GameCard'
@@ -68,6 +68,9 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
   const [activeCategory, setActiveCategory] = useState<string>('todos')
   const [bannerIndex, setBannerIndex] = useState(0)
   const [bannerPaused, setBannerPaused] = useState(false)
+  const [featuredIndex, setFeaturedIndex] = useState(0)
+  const [featuredPaused, setFeaturedPaused] = useState(false)
+  const featuredTrackRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (initialGames.length > 0) {
@@ -212,6 +215,35 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
   // Banner activo del carrusel
   const heroBanner =
     activeBanners.length > 0 ? activeBanners[bannerIndex % activeBanners.length] : null
+
+  // ─── Carrusel de DESTACADOS: auto-rotación cada 6s (pausa con mouse/touch encima) ───
+  useEffect(() => {
+    if (featuredGames.length <= 1 || featuredPaused) return
+    const id = setInterval(() => {
+      setFeaturedIndex((i) => (i + 1) % featuredGames.length)
+    }, 6000)
+    return () => clearInterval(id)
+  }, [featuredGames.length, featuredPaused])
+
+  // Sincroniza el scroll del track con el índice (swipe manual → dots/flechas)
+  const handleFeaturedScroll = () => {
+    const track = featuredTrackRef.current
+    if (!track || track.children.length === 0) return
+    const step = (track.children[0] as HTMLElement).offsetWidth + 20 // gap-5
+    const idx = Math.round(track.scrollLeft / step)
+    if (idx !== featuredIndex) {
+      setFeaturedIndex(Math.min(Math.max(idx, 0), featuredGames.length - 1))
+    }
+  }
+
+  // Flechas: desplazan el track con scroll suave
+  const scrollFeaturedTo = (index: number) => {
+    const track = featuredTrackRef.current
+    if (!track || track.children.length === 0) return
+    const step = (track.children[0] as HTMLElement).offsetWidth + 20 // gap-5
+    track.scrollTo({ left: index * step, behavior: 'smooth' })
+    setFeaturedIndex(index)
+  }
 
   return (
     <div className="vignette brick-bg graffiti-spray min-h-dvh">
@@ -378,20 +410,87 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                 </div>
               )}
 
-              {/* ─── DESTACADOS: cards horizontales grandes ─── */}
+              {/* ─── DESTACADOS: carrusel horizontal ─── */}
               {featuredGames.length > 0 && (
-                <section className="mb-10">
+                <section
+                  className="mb-10"
+                  onMouseEnter={() => setFeaturedPaused(true)}
+                  onMouseLeave={() => setFeaturedPaused(false)}
+                  onTouchStart={() => setFeaturedPaused(true)}
+                  onTouchEnd={() => setFeaturedPaused(false)}
+                >
                   <div className="mb-4 flex items-center gap-3">
                     <h2 className="font-archivo text-xl tracking-wide text-white sm:text-2xl">
                       DESTACADOS <span className="text-yellow-400">🔥</span>
                     </h2>
                     <div className="h-px flex-1 bg-gradient-to-r from-yellow-400/30 to-transparent" />
+
+                    {/* Flechas del carrusel */}
+                    {featuredGames.length > 1 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            scrollFeaturedTo((featuredIndex - 1 + featuredGames.length) % featuredGames.length)
+                          }
+                          aria-label="Anterior destacado"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-colors hover:border-yellow-400/50 hover:bg-yellow-400/10 hover:text-yellow-400"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => scrollFeaturedTo((featuredIndex + 1) % featuredGames.length)}
+                          aria-label="Siguiente destacado"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-colors hover:border-yellow-400/50 hover:bg-yellow-400/10 hover:text-yellow-400"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+                  {/* Track scrolleable con scroll-snap (swipe en móvil) */}
+                  <div
+                    ref={featuredTrackRef}
+                    onScroll={handleFeaturedScroll}
+                    className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-4 pb-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+                  >
                     {featuredGames.map((game, i) => (
-                      <FeaturedCard key={game.slug} game={game} progress={progressMap[game.slug] ?? null} index={i} />
+                      <div
+                        key={game.slug}
+                        className="w-[85%] shrink-0 snap-start sm:w-[62%] lg:w-[48%] xl:w-[40%]"
+                      >
+                        <FeaturedCard
+                          game={game}
+                          progress={progressMap[game.slug] ?? null}
+                          index={i}
+                          active={i === featuredIndex}
+                        />
+                      </div>
                     ))}
                   </div>
+
+                  {/* Dots */}
+                  {featuredGames.length > 1 && (
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                      {featuredGames.map((g, i) => (
+                        <button
+                          key={g.slug}
+                          type="button"
+                          onClick={() => scrollFeaturedTo(i)}
+                          aria-label={`Ir al destacado ${i + 1}`}
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                            i === featuredIndex ? 'w-6 bg-yellow-400' : 'w-1.5 bg-white/30 hover:bg-white/60'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </section>
               )}
 
@@ -533,10 +632,12 @@ function FeaturedCard({
   game,
   progress,
   index,
+  active,
 }: {
   game: GameCatalogEntry
   progress: GameProgress | null
   index: number
+  active?: boolean
 }) {
   const accentColor = game.accent_color ?? game.color ?? '#7C3AED'
   const baseColor = game.color ?? '#7C3AED'
@@ -548,8 +649,11 @@ function FeaturedCard({
     <a
       href={`/jugar/${game.slug}`}
       aria-label={`Jugar ${game.name}`}
-      className="group relative block overflow-hidden rounded-2xl border border-white/[0.06] transition-all duration-300 hover:-translate-y-1"
-      style={{ animationDelay: `${index * 100}ms` }}
+      className="group relative block h-full overflow-hidden rounded-2xl border border-white/[0.06] transition-all duration-300 hover:-translate-y-1"
+      style={{
+        animationDelay: `${index * 100}ms`,
+        boxShadow: active ? `0 0 0 1px ${accentColor}55, 0 8px 40px ${accentColor}22` : undefined,
+      }}
     >
       {/* ═══ Portada CUADRADA limpia (misma línea que GameCard) ═══ */}
       <div className="relative aspect-square w-full overflow-hidden">
