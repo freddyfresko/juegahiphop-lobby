@@ -664,16 +664,18 @@ function FeaturedCard({
     <a
       href={`/jugar/${game.slug}`}
       aria-label={`Jugar ${game.name}`}
-      className="group relative block h-full overflow-hidden rounded-2xl border border-white/[0.08] transition-all duration-500 hover:-translate-y-1"
-      style={{
-        animationDelay: `${index * 100}ms`,
-        boxShadow: active
-          ? `0 0 0 1px ${accentColor}44, 0 12px 48px -8px ${accentColor}40`
-          : '0 4px 24px -12px rgba(0,0,0,0.6)',
-      }}
+      className="group block h-full transition-all duration-500"
+      style={{ animationDelay: `${index * 100}ms` }}
     >
-      {/* ═══ Portada LANDSCAPE con info superpuesta (estilo streaming) ═══ */}
-      <div className="relative aspect-[16/10] w-full overflow-hidden">
+      {/* ═══ Card: SOLO portada + etiquetas (limpia) ═══ */}
+      <div
+        className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl border border-white/[0.08] transition-all duration-500 group-hover:-translate-y-1 group-hover:border-white/20"
+        style={{
+          boxShadow: active
+            ? `0 0 0 1px ${accentColor}44, 0 12px 48px -8px ${accentColor}40`
+            : '0 4px 24px -12px rgba(0,0,0,0.6)',
+        }}
+      >
         {game.image_url ? (
           <img
             src={`${game.image_url}?v=${new Date(game.updated_at).getTime()}`}
@@ -692,10 +694,8 @@ function FeaturedCard({
           </div>
         )}
 
-        {/* Gradiente cinematográfico inferior (legibilidad de la info) */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/25 to-transparent" />
-        {/* Vignette sutil superior */}
-        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent" />
+        {/* Gradiente inferior sutil (respira las etiquetas) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a]/70 via-transparent to-black/20" />
 
         {/* Badge DESTACADO */}
         <div
@@ -711,6 +711,23 @@ function FeaturedCard({
           {String(index + 1).padStart(2, '0')}
         </span>
 
+        {/* Etiqueta categoría/beta abajo-izquierda */}
+        <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+          {game.status === 'beta' && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider backdrop-blur-sm"
+              style={{ backgroundColor: `${accentColor}cc`, color: '#000' }}
+            >
+              Beta
+            </span>
+          )}
+          {game.category && game.category !== 'games' && (
+            <span className="rounded-full border border-white/15 bg-black/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-200 backdrop-blur-sm">
+              {game.category}
+            </span>
+          )}
+        </div>
+
         {/* Overlay hover con botón JUGAR */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
           <div
@@ -725,52 +742,36 @@ function FeaturedCard({
             </svg>
           </div>
         </div>
-
-        {/* ═══ Info superpuesta en la portada ═══ */}
-        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
-          <div className="mb-1.5 flex items-center gap-2">
-            {game.status === 'beta' && (
-              <span
-                className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider backdrop-blur-sm"
-                style={{ backgroundColor: `${accentColor}33`, color: accentColor }}
-              >
-                Beta
-              </span>
-            )}
-            <span className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-300 backdrop-blur-sm">
-              {game.category && game.category !== 'games' ? game.category : 'Jugar ahora'}
-            </span>
-          </div>
-
-          <h3
-            className="font-archivo text-2xl leading-none tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] sm:text-3xl"
-            style={{ color: accentColor }}
-          >
-            {game.name}
-          </h3>
-
-          <p className="mt-1.5 line-clamp-2 max-w-[90%] text-[11px] uppercase leading-relaxed tracking-wide text-zinc-300/90">
-            {game.short_description}
-          </p>
-
-          {progress && progress.total > 0 && (
-            <div className="mt-3 max-w-[85%]">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-[9px] uppercase tracking-wider text-zinc-400">{progress.label}</span>
-                <span className="text-[10px] font-bold" style={{ color: accentColor }}>
-                  {progress.current}/{progress.total}
-                </span>
-              </div>
-              <div className="h-1 overflow-hidden rounded-full bg-white/15">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{ backgroundColor: accentColor, width: `${progressPct}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* ═══ Título FUERA de la card (pie limpio) ═══ */}
+      <div className="mt-2.5 flex items-center justify-between gap-3 px-1">
+        <h3
+          className="font-archivo text-lg leading-tight tracking-wide transition-colors duration-300 group-hover:text-white sm:text-xl"
+          style={{ color: accentColor }}
+        >
+          {game.name}
+        </h3>
+
+        <svg
+          className="h-4 w-4 shrink-0 translate-x-0 text-white/30 opacity-0 transition-all duration-300 group-hover:translate-x-1 group-hover:opacity-100"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+
+      {progress && progress.total > 0 && (
+        <div className="mx-1 mt-2 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{ backgroundColor: accentColor, width: `${progressPct}%` }}
+          />
+        </div>
+      )}
     </a>
   )
 }
