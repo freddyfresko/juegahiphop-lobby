@@ -185,9 +185,9 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
 
   // Juegos destacados (featured) — cards horizontales grandes
   const featuredGames = availableGames.filter((g) => g.featured)
-  const gridGames = featuredGames.length > 0
-    ? availableGames.filter((g) => !g.featured)
-    : availableGames
+  // "TODOS LOS JUEGOS" muestra TODOS los jugables (destacados incluidos —
+  // pueden aparecer también en los destacados, es intencional)
+  const gridGames = availableGames
 
   // Filtro por categoría
   const visibleGrid = activeCategory === 'todos'

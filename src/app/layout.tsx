@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next'
 import { Bangers, Inter } from 'next/font/google'
 import './globals.css'
 import { baseMetadata, webSiteJsonLd, SITE_NAME, SITE_URL } from '@/lib/seo'
-import AdsterraScripts from '@/components/AdsterraScripts'
 
 const bangers = Bangers({
   weight: '400',
@@ -84,8 +83,10 @@ export default function RootLayout({
             .content-with-rail { padding-top: 4rem; padding-bottom: 0; }
           }
         `}</style>
-        {/* Adsterra: popunder + social bar (scripts globales del sitio) */}
-        <AdsterraScripts />
+        {/* Ads: SOLO formatos fijos controlados por componente (AdsterraBanner en
+            home/ranking/perfil + AdOverlay programado dentro del juego). Nada de
+            scripts site-wide flotantes: la social bar (popup-like) y el popunder
+            de Adsterra están RETIRADOS (ago-2026, decisión de Freddy). */}
         {children}
       </body>
     </html>
