@@ -71,6 +71,8 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const [featuredPaused, setFeaturedPaused] = useState(false)
   const featuredTrackRef = useRef<HTMLDivElement | null>(null)
+  // Evita que el onScroll del track pise los scrolls programáticos (timer/flechas/dots)
+  const featuredProgrammatic = useRef(false)
 
   useEffect(() => {
     if (initialGames.length > 0) {
@@ -216,7 +218,9 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
   const heroBanner =
     activeBanners.length > 0 ? activeBanners[bannerIndex % activeBanners.length] : null
 
-  // ─── Carrusel de DESTACADOS: auto-rotación cada 6s (pausa con mouse/touch encima) ───
+  // ─── Carrusel de DESTACADOS ───
+  // Auto-rotación: cada 6s avanza al siguiente (se pausa con mouse/touch encima).
+  // Solo cambia el índice; el efecto de abajo desplaza el track.
   useEffect(() => {
     if (featuredGames.length <= 1 || featuredPaused) return
     const id = setInterval(() => {
@@ -225,8 +229,25 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
     return () => clearInterval(id)
   }, [featuredGames.length, featuredPaused])
 
-  // Sincroniza el scroll del track con el índice (swipe manual → dots/flechas)
+  // Sincroniza el scroll del track con el índice (timer, flechas, dots, swipe)
+  useEffect(() => {
+    const track = featuredTrackRef.current
+    if (!track || track.children.length === 0) return
+    const step = (track.children[0] as HTMLElement).offsetWidth + 20 // gap-5
+    const maxScroll = Math.max(track.scrollWidth - track.clientWidth, 0)
+    const left = Math.min(featuredIndex * step, maxScroll)
+    if (Math.abs(track.scrollLeft - left) > 4) {
+      featuredProgrammatic.current = true
+      track.scrollTo({ left, behavior: 'smooth' })
+      window.setTimeout(() => {
+        featuredProgrammatic.current = false
+      }, 800)
+    }
+  }, [featuredIndex, featuredGames.length])
+
+  // Swipe manual del usuario → actualiza el índice según la posición del track
   const handleFeaturedScroll = () => {
+    if (featuredProgrammatic.current) return
     const track = featuredTrackRef.current
     if (!track || track.children.length === 0) return
     const step = (track.children[0] as HTMLElement).offsetWidth + 20 // gap-5
@@ -236,14 +257,9 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
     }
   }
 
-  // Flechas: desplazan el track con scroll suave
-  const scrollFeaturedTo = (index: number) => {
-    const track = featuredTrackRef.current
-    if (!track || track.children.length === 0) return
-    const step = (track.children[0] as HTMLElement).offsetWidth + 20 // gap-5
-    track.scrollTo({ left: index * step, behavior: 'smooth' })
-    setFeaturedIndex(index)
-  }
+  // Flechas y dots: solo cambian el índice (el efecto mueve el track)
+  const goFeatured = (dir: 1 | -1) =>
+    setFeaturedIndex((i) => (i + dir + featuredGames.length) % featuredGames.length)
 
   return (
     <div className="vignette brick-bg graffiti-spray min-h-dvh">
@@ -414,8 +430,6 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
               {featuredGames.length > 0 && (
                 <section
                   className="mb-10"
-                  onMouseEnter={() => setFeaturedPaused(true)}
-                  onMouseLeave={() => setFeaturedPaused(false)}
                   onTouchStart={() => setFeaturedPaused(true)}
                   onTouchEnd={() => setFeaturedPaused(false)}
                 >
@@ -430,9 +444,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() =>
-                            scrollFeaturedTo((featuredIndex - 1 + featuredGames.length) % featuredGames.length)
-                          }
+                          onClick={() => goFeatured(-1)}
                           aria-label="Anterior destacado"
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-colors hover:border-yellow-400/50 hover:bg-yellow-400/10 hover:text-yellow-400"
                         >
@@ -442,7 +454,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                         </button>
                         <button
                           type="button"
-                          onClick={() => scrollFeaturedTo((featuredIndex + 1) % featuredGames.length)}
+                          onClick={() => goFeatured(1)}
                           aria-label="Siguiente destacado"
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-colors hover:border-yellow-400/50 hover:bg-yellow-400/10 hover:text-yellow-400"
                         >
@@ -458,12 +470,15 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                   <div
                     ref={featuredTrackRef}
                     onScroll={handleFeaturedScroll}
-                    className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-4 pb-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+                    className="no-scrollbar -mx-4 flex snap-x snap-proximity gap-5 overflow-x-auto scroll-smooth px-4 pb-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
                   >
                     {featuredGames.map((game, i) => (
                       <div
                         key={game.slug}
-                        className="w-[85%] shrink-0 snap-start sm:w-[62%] lg:w-[48%] xl:w-[40%]"
+                        className={`w-[76%] shrink-0 snap-start transition-all duration-500 sm:w-[52%] lg:w-[40%] xl:w-[32%] ${
+                          i === featuredIndex ? 'opacity-100' : 'opacity-45 saturate-[0.8]'
+                        }`}
+                        style={{ transform: i === featuredIndex ? 'scale(1)' : 'scale(0.955)' }}
                       >
                         <FeaturedCard
                           game={game}
@@ -482,7 +497,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                         <button
                           key={g.slug}
                           type="button"
-                          onClick={() => scrollFeaturedTo(i)}
+                          onClick={() => setFeaturedIndex(i)}
                           aria-label={`Ir al destacado ${i + 1}`}
                           className={`h-1.5 rounded-full transition-all duration-300 ${
                             i === featuredIndex ? 'w-6 bg-yellow-400' : 'w-1.5 bg-white/30 hover:bg-white/60'
@@ -649,19 +664,21 @@ function FeaturedCard({
     <a
       href={`/jugar/${game.slug}`}
       aria-label={`Jugar ${game.name}`}
-      className="group relative block h-full overflow-hidden rounded-2xl border border-white/[0.06] transition-all duration-300 hover:-translate-y-1"
+      className="group relative block h-full overflow-hidden rounded-2xl border border-white/[0.08] transition-all duration-500 hover:-translate-y-1"
       style={{
         animationDelay: `${index * 100}ms`,
-        boxShadow: active ? `0 0 0 1px ${accentColor}55, 0 8px 40px ${accentColor}22` : undefined,
+        boxShadow: active
+          ? `0 0 0 1px ${accentColor}44, 0 12px 48px -8px ${accentColor}40`
+          : '0 4px 24px -12px rgba(0,0,0,0.6)',
       }}
     >
-      {/* ═══ Portada CUADRADA limpia (misma línea que GameCard) ═══ */}
-      <div className="relative aspect-square w-full overflow-hidden">
+      {/* ═══ Portada LANDSCAPE con info superpuesta (estilo streaming) ═══ */}
+      <div className="relative aspect-[16/10] w-full overflow-hidden">
         {game.image_url ? (
           <img
             src={`${game.image_url}?v=${new Date(game.updated_at).getTime()}`}
             alt={game.name}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]"
             loading="lazy"
           />
         ) : (
@@ -675,75 +692,84 @@ function FeaturedCard({
           </div>
         )}
 
-        {/* Gradiente sutil inferior (no tapa la imagen) */}
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0a0a0a]/50 to-transparent" />
+        {/* Gradiente cinematográfico inferior (legibilidad de la info) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/25 to-transparent" />
+        {/* Vignette sutil superior */}
+        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent" />
 
         {/* Badge DESTACADO */}
         <div
-          className="absolute left-3 top-3 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-black"
+          className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-black backdrop-blur-sm"
           style={{ backgroundColor: accentColor }}
         >
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-black/60" />
           DESTACADO
         </div>
 
+        {/* Número de posición */}
+        <span className="absolute right-3 top-3 font-archivo text-2xl leading-none text-white/25">
+          {String(index + 1).padStart(2, '0')}
+        </span>
+
         {/* Overlay hover con botón JUGAR */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
           <div
-            className="flex h-16 w-16 scale-75 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-100"
+            className="flex h-14 w-14 scale-75 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-100"
             style={{
               backgroundColor: `${accentColor}ee`,
-              boxShadow: `0 0 0 8px ${accentColor}22, 0 0 40px ${accentColor}88`,
+              boxShadow: `0 0 0 6px ${accentColor}22, 0 0 36px ${accentColor}88`,
             }}
           >
-            <svg className="ml-1 h-7 w-7 text-black" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="ml-0.5 h-6 w-6 text-black" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
           </div>
         </div>
-      </div>
 
-      {/* ═══ Pie: título + descripción FUERA del cuadrado ═══ */}
-      <div className="bg-[#0d0d0d] p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-archivo text-xl leading-tight tracking-wide" style={{ color: accentColor }}>
-            {game.name}
-          </h3>
-
-          <div className="flex shrink-0 items-center gap-1.5">
+        {/* ═══ Info superpuesta en la portada ═══ */}
+        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+          <div className="mb-1.5 flex items-center gap-2">
             {game.status === 'beta' && (
               <span
-                className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider backdrop-blur-sm"
                 style={{ backgroundColor: `${accentColor}33`, color: accentColor }}
               >
                 Beta
               </span>
             )}
-            <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-300">
-              {game.category && game.category !== 'games' ? game.category : 'Destacado'}
+            <span className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-300 backdrop-blur-sm">
+              {game.category && game.category !== 'games' ? game.category : 'Jugar ahora'}
             </span>
           </div>
+
+          <h3
+            className="font-archivo text-2xl leading-none tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] sm:text-3xl"
+            style={{ color: accentColor }}
+          >
+            {game.name}
+          </h3>
+
+          <p className="mt-1.5 line-clamp-2 max-w-[90%] text-[11px] uppercase leading-relaxed tracking-wide text-zinc-300/90">
+            {game.short_description}
+          </p>
+
+          {progress && progress.total > 0 && (
+            <div className="mt-3 max-w-[85%]">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[9px] uppercase tracking-wider text-zinc-400">{progress.label}</span>
+                <span className="text-[10px] font-bold" style={{ color: accentColor }}>
+                  {progress.current}/{progress.total}
+                </span>
+              </div>
+              <div className="h-1 overflow-hidden rounded-full bg-white/15">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ backgroundColor: accentColor, width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
-
-        <p className="mt-1 line-clamp-2 text-[11px] uppercase leading-relaxed tracking-wide text-zinc-500">
-          {game.short_description}
-        </p>
-
-        {progress && progress.total > 0 && (
-          <div className="mt-3">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[9px] uppercase tracking-wider text-zinc-600">{progress.label}</span>
-              <span className="text-[10px] font-bold" style={{ color: accentColor }}>
-                {progress.current}/{progress.total}
-              </span>
-            </div>
-            <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ backgroundColor: accentColor, width: `${progressPct}%` }}
-              />
-            </div>
-          </div>
-        )}
       </div>
     </a>
   )
