@@ -20,6 +20,9 @@ export interface GameCatalogEntry {
   status: 'active' | 'beta' | 'coming_soon' | 'maintenance' | 'hidden'
   featured: boolean
   orientation: 'landscape' | 'portrait' | 'any'
+  /** Plataforma: 'mobile' (default), 'pc' o 'both'. Puede venir ausente si la
+   *  DB todavía no tiene la columna — ver src/lib/game-platform.ts */
+  platform?: 'mobile' | 'pc' | 'both' | null
   external_url: string
   category: string
   sort_order: number

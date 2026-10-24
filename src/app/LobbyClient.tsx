@@ -8,6 +8,7 @@ import Logo from '@/components/Logo'
 import AdsterraBanner from '@/components/AdsterraBanner'
 import Link from 'next/link'
 import { getActiveBanners } from '@/lib/banner-utils'
+import { isMobileGame, isPcGame } from '@/lib/game-platform'
 import type { PlayerProfile, GameCatalogEntry, GameProgress, Banner } from '@/lib/types'
 import type { User } from '@supabase/supabase-js'
 
@@ -198,6 +199,10 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
   const visibleGrid = activeCategory === 'todos'
     ? gridGames
     : gridGames.filter((g) => g.category === activeCategory)
+
+  // Separación por plataforma: el home muestra PC y celular en secciones distintas
+  const pcGames = visibleGrid.filter(isPcGame)
+  const mobileGames = visibleGrid.filter(isMobileGame)
 
   // Banners VIGENTES ordenados por prioridad (carrusel del hero)
   const activeBanners = useMemo(() => getActiveBanners(banners), [banners])
@@ -509,7 +514,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                 </section>
               )}
 
-              {/* ─── TODOS LOS JUEGOS ─── */}
+              {/* ─── CATÁLOGO: filtros + secciones por plataforma ─── */}
               {gridGames.length > 0 && (
                 <section>
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -555,7 +560,7 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                     </p>
                   )}
 
-                  {visibleGrid.length === 0 ? (
+                  {pcGames.length === 0 && mobileGames.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-white/[0.06] p-10 text-center">
                       <div className="mb-2 text-3xl">🎮</div>
                       <p className="text-xs uppercase tracking-wider text-zinc-500">
@@ -563,12 +568,31 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {visibleGrid.map((game, i) => (
-                        <div key={game.slug} className="animate-fade-in-up" style={{ animationDelay: `${(i % 8) * 60}ms` }}>
-                          <GameCard game={game} progress={progressMap[game.slug] ?? null} />
+                    <div className="flex flex-col gap-10">
+                      {/* En PC arranca la sección de PC; en móvil, la de celular */}
+                      {pcGames.length > 0 && (
+                        <div className="order-2 lg:order-1">
+                          <PlatformHeader
+                            icon="💻"
+                            title="JUEGOS DE"
+                            accent="PC"
+                            hint="Teclado y mouse · pantalla grande"
+                          />
+                          <GameGrid games={pcGames} progressMap={progressMap} />
                         </div>
-                      ))}
+                      )}
+
+                      {mobileGames.length > 0 && (
+                        <div className="order-1 lg:order-2">
+                          <PlatformHeader
+                            icon="📱"
+                            title="JUEGOS DE"
+                            accent="CELULAR"
+                            hint="Un toque y a jugar"
+                          />
+                          <GameGrid games={mobileGames} progressMap={progressMap} />
+                        </div>
+                      )}
                     </div>
                   )}
                 </section>
@@ -637,6 +661,53 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
           </div>
         </footer>
       </div>
+    </div>
+  )
+}
+
+// ─── Cabecera de sección por plataforma (PC / Celular) ───
+
+function PlatformHeader({
+  icon,
+  title,
+  accent,
+  hint,
+}: {
+  icon: string
+  title: string
+  accent: string
+  hint?: string
+}) {
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <h3 className="flex items-center gap-2 font-archivo text-base leading-none tracking-wide text-white sm:text-lg">
+        <span className="text-lg leading-none">{icon}</span>
+        {title}{' '}<span className="text-yellow-400">{accent}</span>
+      </h3>
+      {hint && (
+        <span className="hidden text-[10px] uppercase tracking-wider text-zinc-600 sm:inline">{hint}</span>
+      )}
+      <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+    </div>
+  )
+}
+
+// ─── Grilla de juegos (usada por cada sección de plataforma) ───
+
+function GameGrid({
+  games,
+  progressMap,
+}: {
+  games: GameCatalogEntry[]
+  progressMap: Record<string, GameProgress | null>
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {games.map((game, i) => (
+        <div key={game.slug} className="animate-fade-in-up" style={{ animationDelay: `${(i % 8) * 60}ms` }}>
+          <GameCard game={game} progress={progressMap[game.slug] ?? null} />
+        </div>
+      ))}
     </div>
   )
 }
