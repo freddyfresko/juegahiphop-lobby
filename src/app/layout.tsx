@@ -83,10 +83,12 @@ export default function RootLayout({
             .content-with-rail { padding-top: 4rem; padding-bottom: 0; }
           }
         `}</style>
-        {/* Ads: SOLO formatos fijos controlados por componente (AdsterraBanner en
-            home/ranking/perfil + AdOverlay programado dentro del juego). Nada de
-            scripts site-wide flotantes: la social bar (popup-like) y el popunder
-            de Adsterra están RETIRADOS (ago-2026, decisión de Freddy). */}
+        {/* Ads: DESACTIVADAS (oct-2026, decisión de Freddy). No hay banners en
+            home/ranking/perfil ni AdOverlay dentro del juego; el lobby responde
+            `unavailable` a cualquier campaign_request del SDK. Los componentes
+            (AdsterraBanner, AdOverlay) y el admin de campañas quedan intactos
+            para poder reactivar. Nada de scripts site-wide flotantes: la social
+            bar y el popunder de Adsterra están RETIRADOS (ago-2026). */}
         {children}
       </body>
     </html>

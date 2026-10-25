@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import AvatarUpload from '@/components/AvatarUpload'
-import AdsterraBanner from '@/components/AdsterraBanner'
 import { useIsAdmin } from '@/lib/use-is-admin'
 import type { PlayerProfile, AchievementUnlock, AchievementDefinition, GameCatalogEntry } from '@/lib/types'
 import type { User } from '@supabase/supabase-js'
@@ -306,11 +305,6 @@ export default function PerfilClient({ userId }: PerfilClientProps) {
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* Banner Adsterra 300x250 */}
-            <div className="mb-10 flex justify-center">
-              <AdsterraBanner format="300x250" />
             </div>
 
             {/* ─── Últimas partidas (solo 3, compactas) ─── */}

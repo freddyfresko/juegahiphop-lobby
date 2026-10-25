@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import GameCard from '@/components/GameCard'
 import Logo from '@/components/Logo'
-import AdsterraBanner from '@/components/AdsterraBanner'
 import Link from 'next/link'
 import { getActiveBanners } from '@/lib/banner-utils'
 import { isMobileGame, isPcGame } from '@/lib/game-platform'
@@ -381,11 +380,6 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
 
         {/* ─── CONTENIDO PRINCIPAL ─── */}
         <main id="juegos" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-          {/* ─── Banner Adsterra (desktop 728x90 / móvil 300x250) ─── */}
-          <div className="mb-8 flex justify-center">
-            <AdsterraBanner format="728x90" className="hidden md:block" />
-            <AdsterraBanner format="300x250" className="md:hidden" />
-          </div>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20">
               <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-yellow-400/30 border-t-yellow-400" />
@@ -623,11 +617,6 @@ export default function LobbyClient({ initialGames, initialBanners }: LobbyClien
                   </p>
                 </div>
               )}
-
-              {/* ─── Banner native Adsterra ─── */}
-              <div className="mt-12 flex justify-center">
-                <AdsterraBanner format="native" />
-              </div>
             </>
           )}
         </main>
